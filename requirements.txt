@@ -1,0 +1,7 @@
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+undetected-chromedriver>=3.5.0
+setuptools>=68.0.0
+selenium>=4.18.1
+flask>=3.0.0
+flask-cors>=4.0.0
