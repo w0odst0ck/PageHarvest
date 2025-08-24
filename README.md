@@ -20,7 +20,7 @@
 
 1. 克隆项目到本地：
 ```bash
-git clone [项目地址]
+git clone https://github.com/LingmaFuture/1688-scrapy.git
 cd 1688-scraper
 ```
 
