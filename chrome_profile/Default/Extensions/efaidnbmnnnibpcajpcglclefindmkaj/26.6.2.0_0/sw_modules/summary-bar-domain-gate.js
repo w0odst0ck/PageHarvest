@@ -1,0 +1,18 @@
+/*************************************************************************
+* ADOBE CONFIDENTIAL
+* ___________________
+*
+*  Copyright 2015 Adobe Systems Incorporated
+*  All Rights Reserved.
+*
+* NOTICE:  All information contained herein is, and remains
+* the property of Adobe Systems Incorporated and its suppliers,
+* if any.  The intellectual and technical concepts contained
+* herein are proprietary to Adobe Systems Incorporated and its
+* suppliers and are protected by all applicable intellectual property laws,
+* including trade secret and or copyright laws.
+* Dissemination of this information or reproduction of this material
+* is strictly forbidden unless prior written permission is obtained
+* from Adobe Systems Incorporated.
+**************************************************************************/
+import{common as t}from"./common.js";import{floodgate as r}from"./floodgate.js";import{dcLocalStorage as e}from"../common/local-storage.js";import{CACHE_PURGE_SCHEME as a}from"./constant.js";import n from"./CacheStore.js";import{forceResetService as o}from"./force-reset-service.js";import{loggingApi as s}from"../common/loggingApi.js";const i="dc-cv-aia-webpage-summary-cta",m="summaryBarAllowlistDomains",c="abcdefghijklmnopqrstuvwxyz0123456789.-";const u=function(){const t={};for(let r=0;r<38;r+=1)t["tubg6lxdq8jc1m9-vw.pfhskar0oi5zn372ye4"[r]]=c[r];return t}();function l(t){return t?String(t).toLowerCase().replace(/^www\./,""):""}function f(t,r){return!(!t||!r)&&(t===r||t.endsWith(`.${r}`))}function y(t,r){return r.some(r=>{const e=l(String(r).toLowerCase().split("").map(t=>u[t]||t).join(""));return f(t,e)})}const S=new n("summary-bar-allowlist");let p=null;async function g(){const r=t.getSummaryBarAllowlistUri();if(!r)return[];try{const t=async()=>{const t=await async function(t){const r=await fetch(t,{credentials:"omit"});if(!r.ok)throw new Error(`Failed to fetch summary bar allowlist from ${t}: ${r.statusText}`);return(await r.text()).split("\n").map(t=>t.trim()).filter(t=>t.length>0)}(r);return t?.length>0&&await S.set(m,t),t||[]},{executionResult:e}=await o.executeFeature("summary-bar-allowlist",t);if(e?.length>0)return e}catch(t){s.error({message:"Error fetching summary bar allowlist from CDN",error:t?.message||String(t),url:r})}return await S.get(m)||[]}export const SUMMARY_BAR_CONTENT_SCRIPT_FILES=Object.freeze(["content_scripts/SidePanel/SummaryBar/SummaryBarConfig.js","content_scripts/SidePanel/SummaryBar/SummaryBarEligibility.js","content_scripts/SidePanel/SummaryBar/SummaryBarArticleGate.js","content_scripts/SidePanel/SummaryBar/SummaryBarAnchorDetector.js","content_scripts/SidePanel/SummaryBar/SummaryBarStyles.js","content_scripts/SidePanel/SummaryBar/SummaryBarInsertionMeta.js","content_scripts/SidePanel/SummaryBar/SummaryBarInjector.js","content_scripts/SidePanel/SummaryBar/SummaryBarManager.js"]);export const summaryBarDomainGate={async evaluate(t){const n=l(t);if(!n)return!1;if(!await r.hasFlag(i,a.NO_CALL))return!1;const o=function(){let t=r.getFeatureMeta(i);if(t||(t=e.getItem("aiaWebpageSummaryCtaMeta")),!t||"string"!=typeof t)return{};try{const r=JSON.parse(t);return"object"==typeof r&&null!==r?r:{}}catch{return{}}}(),s=function(t){const r=t.domainBlocklist??t.blocklist;return Array.isArray(r)?r.map(l).filter(Boolean):[]}(o);if(function(t,r){return r.some(r=>f(t,r))}(n,s))return!1;if(function(t){return Boolean(t.bypassDomainGate||t.bypassDomainCheck)}(o))return!0;const m=await async function(){return p||(p=g().finally(()=>{p=null}),p)}();return!!m.length&&y(n,m)}};

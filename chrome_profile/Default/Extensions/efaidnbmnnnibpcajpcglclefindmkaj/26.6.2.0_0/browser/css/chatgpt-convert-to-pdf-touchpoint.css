@@ -1,0 +1,18 @@
+/*************************************************************************
+* ADOBE CONFIDENTIAL
+* ___________________
+*
+*  Copyright 2015 Adobe Systems Incorporated
+*  All Rights Reserved.
+*
+* NOTICE:  All information contained herein is, and remains
+* the property of Adobe Systems Incorporated and its suppliers,
+* if any.  The intellectual and technical concepts contained
+* herein are proprietary to Adobe Systems Incorporated and its
+* suppliers and are protected by all applicable intellectual property laws,
+* including trade secret and or copyright laws.
+* Dissemination of this information or reproduction of this material
+* is strictly forbidden unless prior written permission is obtained
+* from Adobe Systems Incorporated.
+**************************************************************************/
+.acrobat-chatgpt-convert-to-pdf-btn{align-items:center;background:#fff;border:none;border-radius:8px;box-sizing:border-box;color:inherit;cursor:pointer;display:flex;flex-direction:row;font-family:Inter,sans-serif;font-size:14px;font-weight:500;gap:6px;height:36px;line-height:16px;outline:none;padding:8px 14px;transition:background-color .15s;white-space:nowrap}.acrobat-chatgpt-convert-to-pdf-btn:hover{background-color:#80808026}.acrobat-chatgpt-convert-to-pdf-btn:focus-visible{background-color:#80808026!important;outline:2px solid #0060df!important;outline-offset:2px!important}.acrobat-chatgpt-convert-to-pdf-btn--loading:hover{background:#00000000}.acrobat-chatgpt-convert-to-pdf-btn--loading .acrobat-chatgpt-convert-to-pdf-icon{display:none}.acrobat-chatgpt-convert-to-pdf-btn--loading .acrobat-chatgpt-convert-to-pdf-loader{display:block}.acrobat-chatgpt-convert-to-pdf-divider{align-self:center;background-color:currentColor;height:24px;margin:0 8px 0 4px;opacity:.2;width:1px}.acrobat-chatgpt-convert-to-pdf-icon{flex-shrink:0;height:18px;width:18px}.acrobat-chatgpt-convert-to-pdf-loader{display:none;flex-shrink:0;height:16px;width:16px}html.dark .acrobat-chatgpt-convert-to-pdf-btn{background:#000}html.dark .acrobat-chatgpt-convert-to-pdf-btn:hover{background-color:#ffffff1a}@media (max-width:836px){.acrobat-chatgpt-convert-to-pdf-btn,.acrobat-chatgpt-convert-to-pdf-divider{display:none!important}}
