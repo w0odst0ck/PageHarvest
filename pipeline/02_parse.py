@@ -13,12 +13,19 @@
   listing_date, review_count, shop_age, return_rate
 """
 
-import os, glob, csv, re
+import os, glob, csv, re, sys
 from bs4 import BeautifulSoup
 from collections import Counter
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(PROJECT_DIR, "data")
+
+# 支持 --cat 参数指定品类
+CATEGORY = None
+for i, a in enumerate(sys.argv[1:], 1):
+    if a == '--cat' and i < len(sys.argv):
+        CATEGORY = sys.argv[i + 1]
+        break
 
 FIELDS = [
     'keyword', 'title', 'price', 'sales', 'desc', 'tags',
@@ -130,7 +137,11 @@ def parse_html(filepath):
 
 def parse_all():
     html_files = []
-    for root, dirs, files in os.walk(DATA_DIR):
+    search_root = os.path.join(DATA_DIR, CATEGORY) if CATEGORY else DATA_DIR
+    if not os.path.exists(search_root):
+        print("错误: 目录不存在", search_root)
+        return []
+    for root, dirs, files in os.walk(search_root):
         for f in files:
             if f.endswith('.html') and not f.endswith('_files.html'):
                 html_files.append(os.path.join(root, f))
@@ -204,6 +215,7 @@ if __name__ == "__main__":
     if not products:
         sys.exit(1)
 
-    csv_path = os.path.join(DATA_DIR, "all_products.csv")
+    out_dir = os.path.join(DATA_DIR, CATEGORY) if CATEGORY else DATA_DIR
+    csv_path = os.path.join(out_dir, "all_products.csv")
     save_csv(products, csv_path)
     print_stats(products)

@@ -9,9 +9,18 @@ import os, csv, sys
 from collections import Counter, defaultdict
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-INPUT = os.path.join(PROJECT_DIR, "data", "cleaned_products.csv")
-OUTPUT_TXT = os.path.join(PROJECT_DIR, "data", "analysis_report.txt")
-OUTPUT_PNG = os.path.join(PROJECT_DIR, "data", "analysis_chart.png")
+
+# 支持 --cat 参数指定品类
+CATEGORY = None
+for i, a in enumerate(sys.argv[1:], 1):
+    if a == '--cat' and i < len(sys.argv):
+        CATEGORY = sys.argv[i + 1]
+        break
+
+data_dir = os.path.join(PROJECT_DIR, "data", CATEGORY) if CATEGORY else os.path.join(PROJECT_DIR, "data")
+INPUT = os.path.join(data_dir, "cleaned_products.csv")
+OUTPUT_TXT = os.path.join(data_dir, "analysis_report.txt")
+OUTPUT_PNG = os.path.join(data_dir, "analysis_chart.png")
 
 
 def save_report(text, filepath):
@@ -33,7 +42,7 @@ def main():
     report_lines = []
     report_lines.append("=" * 55)
     report_lines.append("  1688 商品数据分析报告")
-    report_lines.append("  数据源: 户外灯具 (34页)")
+    report_lines.append("  数据源: {} (34页)".format(CATEGORY or "全部品类"))
     report_lines.append("  商品数: {} 条".format(len(rows)))
     report_lines.append("=" * 55)
     report_lines.append("")

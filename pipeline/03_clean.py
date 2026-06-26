@@ -17,8 +17,17 @@ import os, csv, re, sys
 from collections import Counter
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-INPUT = os.path.join(PROJECT_DIR, "data", "all_products.csv")
-OUTPUT = os.path.join(PROJECT_DIR, "data", "cleaned_products.csv")
+
+# 支持 --cat 参数指定品类
+CATEGORY = None
+for i, a in enumerate(sys.argv[1:], 1):
+    if a == '--cat' and i < len(sys.argv):
+        CATEGORY = sys.argv[i + 1]
+        break
+
+data_dir = os.path.join(PROJECT_DIR, "data", CATEGORY) if CATEGORY else os.path.join(PROJECT_DIR, "data")
+INPUT = os.path.join(data_dir, "all_products.csv")
+OUTPUT = os.path.join(data_dir, "cleaned_products.csv")
 
 # 已知照明品牌词库 (可扩展)
 BRAND_KEYWORDS = [
