@@ -1,194 +1,171 @@
-# 1688 智能照明商品数据采集 & 分析工具
+# 智能照明商品数据采集 & 分析工具
 
-> 从 1688 搜索结果页到商品详情页的完整数据链路：搜索页采集 → 清洗分析 → 精选 → 详情页深度采集。
+> 多平台电商数据采集框架，从搜索页到商品详情页的完整数据链路。  
+> 当前支持 **1688** + **京东** + **震坤行**，可扩展至任意电商平台。
 
 ---
 
 ## 项目概述
 
-两个阶段的数据管线：
+两阶段数据管线，适配多平台：
 
-**第一阶段（搜索层）** — 油猴脚本自动翻页采集 1688 搜索列表页，Python 管线解析、清洗、分析，输出品类全貌报告。
+**第一阶段（搜索层）** — 采集搜索列表页，解析、清洗、分析，输出品类全貌报告。
 
-**第二阶段（详情层）** — 精选 Top 供应商的商品，用 Selenium 下载详情页 HTML，再用 [急云/1688](https://github.com/jiyun/1688) 开源库提取品牌、SKU、主图、详情图、视频、属性等深度数据。
+**第二阶段（详情层）** — 精选 Top 供应商的商品，采集详情页，提取品牌、SKU、主图、详情图、属性等深度数据。
+
+> 1688 详情页解析基于 [急云/1688](https://github.com/jiyun/1688) 开源库。
 
 ---
 
 ## 📂 项目结构
 
 ```
-1688-scrapy/
+1688Collector/
 │
-├── pipeline/                        # 核心管线
-│   ├── 01_fetch.user.js             # 油猴脚本 — 翻页 + 滚动 + 下载 HTML
-│   ├── 02_parse.py                  # HTML → CSV 解析（17 字段）
-│   ├── 03_clean.py                  # 数据清洗（去重 + 价格 + 品牌）
-│   ├── 04_analyze.py                # 数据分析 + 图表生成
-│   ├── 05_manual_urls.py            # 手动录入精选商品详情页 URL
-│   ├── 06_detail_collector.py       # Selenium 下载详情页 + 1688库解析
-│   ├── 07_process_with_1688lib.py   # 调用 1688 库全流程处理（下载资源）
-│   ├── run1.py                      # 一键运行：搜索页管线（解析→清洗→分析）
-│   ├── run2.py                      # 一键运行：详情页管线（录入→解析→资源）
+├── core/                            # 核心模块
+│   ├── schema.py                    # 统一数据模型 (UnifiedProduct, UnifiedDetail, AnalysisReport)
+│   ├── registry.py                  # 平台注册表 (@register 装饰器)
+│   ├── pipeline.py                  # 管线编排器 (搜索页/详情页/跨平台)
+│   ├── storage.py                   # 数据存储 (CSV/报告, 按平台目录)
+│   └── merge.py                     # 跨平台数据合并对比
 │
-├── 1688/                            # 1688 详情页资源采集工具（第三方开源库）
-│   └── 1688/
-│       ├── main.py                  # 主程序入口
-│       ├── start1688.bat            # 拖放 HTML 启动处理
-│       ├── config.py                # 配置文件
-│       └── utils/parsers/
-│           └── alibaba_parser.py    # ★ 核心解析器（品牌、SKU、图片等）
+├── platforms/                       # ★ 平台适配器 (可扩展)
+│   ├── base.py                      # 抽象基类 PlatformAdapter
+│   ├── alibaba/                     # 1688 平台
+│   │   ├── adapter.py               # 适配器 (采集+解析)
+│   │   └── search_parser.py         # 搜索页解析器
+│   ├── jingdong/                    # 京东平台
+│   │   ├── adapter.py               # 适配器
+│   │   └── search_parser.py         # 搜索页解析器
+│   └── zkh/                         # 震坤行平台
+│       ├── adapter.py               # 适配器
+│       └── search_parser.py         # 搜索页解析器
 │
-├── data/                            # 数据目录
-│   ├── 户外灯具/                     # 品类文件夹
-│   │   ├── (*.html)                 # 搜索页原始 HTML（油猴采集）
-│   │   ├── all_products.csv         # 解析后的原始数据
-│   │   ├── cleaned_products.csv     # 清洗去重后的数据
-│   │   ├── analysis_report.txt      # 分析报告
-│   │   ├── analysis_chart.png       # 可视化图表
-│   │   ├── top_products_urls.csv    # 精选商品详情页 URL
-│   │   ├── top_products_details.csv # 精选商品详情数据汇总
-│   │   └── products_detail/         # 详情页 HTML + 解析结果
-│   │       └── {offer_id}/
-│   │           ├── {offer_id}.html
-│   │           ├── _resources.txt
-│   │           └── _1688_parsed.txt
-│   └── 投光灯/                       # 同上
+├── userscripts/                     # ★ 油猴脚本 (纯HTML下载, 不解析)
+│   ├── platform-1688.user.js        # 1688 自动翻页+保存
+│   ├── platform-jd.user.js          # 京东 HTML 下载器 (SPA模式)
+│   └── platform-zkh.user.js         # 震坤行 HTML 下载器
 │
-├── chromedriver-win32/              # ChromeDriver（Selenium 用）
-├── chrome_profile/                  # Chrome 用户数据（保持登录态）
-├── requirements.txt                 # Python 依赖
-└── README.md
+├── data/                            # ★ 数据目录 (按平台归档)
+│   ├── 1688/                        # 1688 采集数据
+│   ├── JD/                          # 京东采集数据
+│   └── ZKH/                         # 震坤行采集数据
+│
+├── pipeline/                        # 旧管道脚本 (兼容)
+│   ├── run.py                       # 统一命令行入口 (v2)
+│   ├── run1.py                      # 原 1688 搜索页管线
+│   └── run2.py                      # 原 1688 详情页管线
+│
+└── requirements.txt                 # Python 依赖
 ```
 
 ---
 
-## 🔧 使用流程
+## 🚀 快速开始
 
-```
-第一阶段：搜索页采集
-═══════════════════════════════════════════
- ① 安装油猴脚本 (01_fetch.user.js)
- ② 打开 1688 搜索关键词 → 自动翻页 34 页
- ③ 将 HTML 移到 data/品类名/
- ④ run1.py --cat 品类名 (解析+清洗+分析)
+### 1. 采集数据 (油猴脚本)
 
-                      ↓
-第二阶段：精选详情采集
-═══════════════════════════════════════════
- ⑤ 看分析报告 → 圈定目标商品
- ⑥ 05_manual_urls.py → 手动录入详情页 URL
- ⑦ 06_detail_collector.py → 下载+解析详情页
- ⑧ run2.py --cat 品类名 (全流程自动化)
-```
+各平台的油猴脚本只做一件事：**模拟人类浏览 → 保存完整 HTML**。
+解析工作由后端 Python 适配器完成。
 
-### 第一阶段：搜索页分析
-
-```powershell
-# 一键跑完搜索页（解析 → 清洗 → 分析）
-.venv\Scripts\python.exe pipeline\run1.py --cat 投光灯
-
-# 或分步执行
-.venv\Scripts\python.exe pipeline\02_parse.py --cat 投光灯
-.venv\Scripts\python.exe pipeline\03_clean.py --cat 投光灯
-.venv\Scripts\python.exe pipeline\04_analyze.py --cat 投光灯
-```
-
-### 第二阶段：详情页深度采集
-
-```powershell
-# 一键跑完详情页（手动录入 → 下载 → 解析 → 资源下载）
-.venv\Scripts\python.exe pipeline\run2.py --cat 投光灯
-
-# 或分步执行
-.venv\Scripts\python.exe pipeline\05_manual_urls.py --cat 投光灯
-.venv\Scripts\python.exe pipeline\06_detail_collector.py --cat 投光灯
-.venv\Scripts\python.exe pipeline\07_process_with_1688lib.py --cat 投光灯
-```
-
----
-
-## 📋 数据字段
-
-### 搜索层（17 列）
-
-| 字段 | 说明 | 来源 |
+| 平台 | 脚本 | 说明 |
 |------|------|------|
-| `title` | 商品标题 | 搜索页 |
-| `price` | 价格 | 搜索页 |
-| `shop_name` | 供应商名称 | 搜索页 |
-| `yearly_sales` | 年销量 | 搜索页插件 |
-| `return_rate` | 回头率 | 搜索页插件 |
-| `shop_age` | 经营时长 | 搜索页插件 |
-| `category` | 品类 | 搜索页插件 |
+| 1688 | `platform-1688.user.js` | 自动翻页+保存 HTML |
+| 京东 | `platform-jd.user.js` | SPA 模式，单页内连续翻页保存 |
+| 震坤行 | `platform-zkh.user.js` | 手动设起始页，自动翻页 20 页 |
 
-### 详情层（补充字段）
+### 2. 解析与分析
 
-| 字段 | 说明 | 来源（AlibabaParser） |
-|------|------|---|
-| `brand` | 品牌 | `get_attributes()` |
-| `spec / product_code` | 型号 / 货号 | `get_attributes() / get_product_code()` |
-| `ship_from` | 发货地 | `get_ship_from()` |
-| `min_order` | 起批量 | `get_min_order()` |
-| `sales_count` | 销量 | `get_sales_count()` |
-| `main_images` | 主图 URL 列表 | `get_main_images()` |
-| `detail_images` | 详情图 URL 列表 | `get_detail_images()` |
-| `videos` | 视频 URL | `get_videos()` |
-| `attributes` | 属性列表（品牌/型号/材质等） | `get_attributes()` |
-| `sku_matrix` | SKU 矩阵（规格/价格/库存） | `get_sku_matrix()` |
-| `color_options` | 色卡选项 | `get_color_options()` |
-| `listing_date` | 上架时间 | `get_plugin_data()` |
-| `yearly_sales_pieces` | 年成交件数 | `get_plugin_data()` |
-| `repurchase_rate` | 复购率 | `get_trend_data()` |
+```python
+from platforms.zkh import ZhenKunHangAdapter
+from core.pipeline import SearchPipeline
+
+# 方式一：直接解析 HTML
+adapter = ZhenKunHangAdapter()
+with open('data/ZKH/xxx.html') as f:
+    products = adapter.parse_search(f.read(), "投光灯")
+
+# 方式二：通过管线
+pipeline = SearchPipeline("震坤行", "data")
+products = pipeline.run("投光灯", html_dir="data/ZKH")
+```
 
 ---
 
-## ✅ 当前状态
+## 🏗️ 扩展新平台
 
-| 品类 | 搜索页 | 详情页 |
-|------|--------|--------|
-| 户外灯具 | ✅ 已完成 | ⏳ |
-| 投光灯 | ✅ 已完成 | ✅ Top 10 |
-| 照明配套 | ⏳ | ⏳ |
-| 面板灯 | ⏳ | ⏳ |
-| 吸顶灯 | ⏳ | ⏳ |
-| 射灯 | ⏳ | ⏳ |
-| 筒灯 | ⏳ | ⏳ |
-| 灯带 | ⏳ | ⏳ |
-| 灯泡 | ⏳ | ⏳ |
-| 灯管 | ⏳ | ⏳ |
-| 灯头 | ⏳ | ⏳ |
-| 泛光灯 | ⏳ | ⏳ |
-| 照明辅件 | ⏳ | ⏳ |
-| 开关电源 照明 | ⏳ | ⏳ |
+1. 在 `platforms/` 下创建目录，如 `platforms/pinduoduo/`
+2. 实现 `PlatformAdapter` 抽象基类
+3. 用 `@register("平台名")` 装饰
+4. 创建油猴脚本保存 HTML
 
----
+```python
+from platforms.base import PlatformAdapter
+from core.registry import register
 
-## 🛠 技术栈
-
-| 工具 | 用途 |
-|------|------|
-| **油猴脚本 (Tampermonkey)** | 搜索页自动翻页 + 滚动加载 |
-| **Python 3 + BeautifulSoup4** | HTML 解析、清洗、分析 |
-| **matplotlib** | 可视化图表 |
-| **Selenium + ChromeDriver** | 详情页动态内容采集 |
-| **[急云/1688](https://github.com/jiyun/1688)** | 1688 详情页深度解析（MIT 协议） |
-
-### 1688 开源库（第三方）
-
-详情页深度解析能力基于 [急云/1688](https://github.com/jiyun/1688) 开源项目，提供：
-
-- `AlibabaParser` — 1688 详情页解析器，提取主图、详情图、色卡图、视频、属性、SKU 价格等
-- `auto_collector.py` — Selenium 在线采集模块，支持浏览器扩展加载
-- `main.py` — 资源下载（aria2c）+ 文件整理 + GUI 管理界面
-- `database.py` — DuckDB 数据存储
+@register("新平台")
+class NewPlatformAdapter(PlatformAdapter):
+    @property
+    def platform_name(self): return "新平台"
+    # 实现所有抽象方法...
+```
 
 ---
 
-## ⚠️ 注意事项
+## 📊 数据存储路径
 
-1. 油猴一次只跑一个关键词，跑完再搜下一个
-2. 1688 使用 GBK 编码，油猴脚本已内置处理
-3. Selenium 需要 Chrome 浏览器 + 已登录 1688 账号
-4. 详情页采集最好在网络稳定的环境下运行
-5. 遵守 1688 平台规则，合理控制采集频率
-6. 1688 开源库的解析器依赖 SingleFile 扩展保存的 HTML 结构，Selenium 直存页面部分功能受限
+管线输出路径已改为**按平台目录**存储：
+
+| 文件类型 | 路径格式 |
+|---------|---------|
+| 搜索页 CSV | `data/{平台}/all_{品类}.csv` |
+| 详情页 CSV | `data/{平台}/top_{品类}_details.csv` |
+| 分析报告 | `data/{平台}/analysis_{品类}.txt` |
+
+---
+
+## ⚙️ 油猴脚本使用说明
+
+### 通用流程
+
+1. 安装 [Tampermonkey](https://www.tampermonkey.net/)
+2. 将 `userscripts/` 下的 `.user.js` 文件拖入浏览器安装
+3. 打开目标平台的搜索页
+4. 脚本会自动弹窗确认 → 模拟滚动 → 保存 HTML → 翻页
+
+### 震坤行 (ZKH)
+
+- 首次运行：等 20 秒让你手动跳到起始页 → 弹窗输入页码
+- 自动翻页直到结束或触发风控
+- 被风控后刷新页面，脚本从断点继续
+- 可在脚本顶部修改 `TOTAL`（总页数）和 `START_PAGE`（起始页）
+
+### 京东 (JD)
+
+- SPA 单页连续模式，不依赖 URL 翻页
+- 自适应滚动到底 → 保存 → 点击下一页 → 循环
+- 京东反爬严格，建议单次不超过 10 页，页间延迟 5~10 秒
+
+### 1688
+
+- 传统页面模式，自动翻页
+- 已有成熟采集逻辑，不动
+
+---
+
+## 🔑 平台对比
+
+| 特性 | 1688 | 京东 | 震坤行 |
+|------|------|------|--------|
+| 渲染方式 | 传统 | SPA (Vue) | 传统 |
+| 反爬强度 | 中等 | 严格 | 中等 (WAF) |
+| 每页商品数 | ~30 | ~30 | 60 |
+| 搜索页销量 | ✅ 有 | ✅ 有 | ❌ 无 |
+| 品牌标签 | 有 | 有 | 行家精选 |
+| 在线采集 | ✅ | ❌ 需浏览器 | ⚠️ WAF 拦截 |
+
+---
+
+## 📝 日志
+
+- **2026-07-02**: 新增震坤行平台适配器；重写京东下载器为 SPA 模式；数据目录按平台归档；管线路径改为平台优先

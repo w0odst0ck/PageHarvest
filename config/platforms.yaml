@@ -1,0 +1,22 @@
+# 平台配置
+# 每个平台的采集策略、延迟、Cookie 等
+
+1688:
+  encoding: gbk
+  delay_seconds: 1.0
+  search_url_template: "https://s.1688.com/selloffer/offer_search.htm?keywords={keyword}&n=y&beginPage={page}"
+  detail_url_template: "https://detail.1688.com/offer/{product_id}.html"
+  headers:
+    User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    Accept-Language: "zh-CN,zh;q=0.9"
+
+京东:
+  encoding: utf-8
+  delay_seconds: 0.5
+  # ⚠ 2026年更新: search.jd.com -> re.jd.com（新搜索页面）
+  search_url_template: "https://re.jd.com/search?keyword={keyword}&page={page}"
+  detail_url_template: "https://item.jd.com/{product_id}.html"
+  note: "新搜索地址 re.jd.com，页面含 JSON 商品数据"
+  headers:
+    User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    Accept-Language: "zh-CN,zh;q=0.9"

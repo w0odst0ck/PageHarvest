@@ -10,23 +10,20 @@ chromedriver-win32/
 chrome_profile/
 .wdm_cache/
 
-# 数据文件 - HTML 原始文件太大，不上传
-data/**/*.html
-data/*/products_detail/
-
-# 数据文件 - 但保留 CSV 结果和分析报告
+# 数据目录（不提交原始采集文件）
+data/**/*
 !data/**/*.csv
 !data/**/*.txt
 !data/**/*.png
 data/_debug_*
 
-# 1688库自身文件（第三方，保持原样）
-1688/1688/.gitignore
-
-# IDE
+# Python
 .vscode/
 .idea/
 
 # 系统
 Thumbs.db
 .DS_Store
+
+# 1688库自身文件
+1688/1688/.gitignore
