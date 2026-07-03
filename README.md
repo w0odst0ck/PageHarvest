@@ -1,20 +1,33 @@
 # PageHarvest
 
-> 1688 反爬？那就绕过浏览器。  
-> 用 Tampermonkey 油猴脚本在页面端直接操作 DOM，自动翻页、勾选、提取、保存——  
-> 把反爬从技术问题变成业务逻辑问题。  
-> 从 14 个商品品类、3000+ 商品搜索页到精选 Top 10 的详情链路，一键闭环。
+> 多平台商品数据采集 & 选品分析框架。  
+> 从搜索列表到详情数据，从采集解析到上架推荐，一站式完成。
 
 ---
 
 ## 概述
 
-PageHarvest 解决两个核心问题：
+PageHarvest 是一个两阶段数据管线，适配多平台：
 
-1. **数据采集** — 适配不同电商平台的搜索页和详情页，统一数据格式
-2. **选品分析** — 基于销量排序、平台标签、品牌格局，输出可执行的上架推荐
+**第一阶段（搜索层）** — 采集搜索列表页，解析、清洗、分析，输出品类全貌报告。
+
+**第二阶段（详情层）** — 精选 Top 供应商的商品，采集详情页，提取品牌、SKU、主图、详情图、属性等深度数据。
+
+**第三阶段（选品层）** — 基于销量排序、平台标签、品牌格局，输出可执行的上架推荐。
 
 当前支持平台：**1688** · **震坤行 (ZKH)**
+
+> 1688 详情页解析基于 [急云/1688](https://github.com/jiyun/1688) 开源库。
+
+## 核心能力
+
+| 阶段 | 覆盖平台 | 产出 |
+|------|---------|------|
+| 搜索页采集 | 1688、震坤行 | 搜索列表 HTML |
+| 搜索页解析 | 1688、震坤行 | 结构化商品数据（CSV） |
+| 详情页采集 | 1688 | 商品详情 HTML |
+| 详情页解析 | 1688（基于急云/1688） | 品牌、SKU、主图、详情图、属性 |
+| 选品分析 | 震坤行 | 分级上架推荐清单 |
 
 ---
 
@@ -44,15 +57,28 @@ pip install -r requirements.txt
 ### 解析与分析
 
 ```python
-# 方式一：直接解析 HTML 文件
+# 搜索页解析
 from platforms.zkh import ZhenKunHangAdapter
 
 adapter = ZhenKunHangAdapter()
 with open('data/ZKH/xxx.html') as f:
     products = adapter.parse_search(f.read(), "关键词")
 
-# 方式二：通过管线
+# 或通过统一管线
 python3 pipeline/run.py search --platform 震坤行 --keyword 关键词 --html-dir data/ZKH/
+
+# 详情页解析（1688）
+from platforms.alibaba import AlibabaAdapter
+adapter = AlibabaAdapter()
+detail = adapter.collect_detail("732462521472")  # offerId
+```
+
+### 详情页深度采集
+
+精选 Top 供应商后，一键采集详情页，提取深度数据：
+
+```bash
+python3 pipeline/run.py detail --platform 1688 --keyword 品类 --product-ids id1,id2,id3
 ```
 
 ### 选品分析
