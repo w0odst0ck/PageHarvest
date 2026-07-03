@@ -1,11 +1,11 @@
-# PageHarvest
+# 智能照明商品数据采集 & 分析工具
 
-> 多平台电商数据采集与解析框架。  
-> 用 Tampermonkey 油猴脚本绕过反爬，后端 Python 统一解析，从搜索页到详情页一键闭环。
+> 多平台电商数据采集框架，从搜索页到商品详情页的完整数据链路。  
+> 当前支持 **1688** + **京东** + **震坤行**，可扩展至任意电商平台。
 
 ---
 
-## 概述
+## 项目概述
 
 两阶段数据管线，适配多平台：
 
@@ -17,57 +17,56 @@
 
 ---
 
-## 项目结构
+## 📂 项目结构
 
 ```
-PageHarvest/
+1688Collector/
 │
-├── core/                          # 核心模块
-│   ├── schema.py                  # 统一数据模型 (UnifiedProduct, UnifiedDetail, AnalysisReport)
-│   ├── registry.py                # 平台注册表 (@register 装饰器)
-│   ├── pipeline.py                # 管线编排器 (搜索页/详情页/跨平台)
-│   ├── storage.py                 # 数据存储 (CSV/报告, 按平台目录)
-│   └── merge.py                   # 跨平台数据合并对比
+├── core/                            # 核心模块
+│   ├── schema.py                    # 统一数据模型 (UnifiedProduct, UnifiedDetail, AnalysisReport)
+│   ├── registry.py                  # 平台注册表 (@register 装饰器)
+│   ├── pipeline.py                  # 管线编排器 (搜索页/详情页/跨平台)
+│   ├── storage.py                   # 数据存储 (CSV/报告, 按平台目录)
+│   └── merge.py                     # 跨平台数据合并对比
 │
-├── platforms/                     # 平台适配器 (可扩展)
-│   ├── base.py                    # 抽象基类 PlatformAdapter
-│   ├── alibaba/                   # 1688 平台
-│   │   ├── adapter.py             # 适配器 (采集+解析)
-│   │   └── search_parser.py       # 搜索页解析器
-│   └── zkh/                       # 震坤行平台
-│       ├── adapter.py             # 适配器
-│       └── search_parser.py       # 搜索页解析器
+├── platforms/                       # ★ 平台适配器 (可扩展)
+│   ├── base.py                      # 抽象基类 PlatformAdapter
+│   ├── alibaba/                     # 1688 平台
+│   │   ├── adapter.py               # 适配器 (采集+解析)
+│   │   └── search_parser.py         # 搜索页解析器
+│   ├── jingdong/                    # 京东平台
+│   │   ├── adapter.py               # 适配器
+│   │   └── search_parser.py         # 搜索页解析器
+│   └── zkh/                         # 震坤行平台
+│       ├── adapter.py               # 适配器
+│       └── search_parser.py         # 搜索页解析器
 │
-├── selection/                     # 选品分析脚本 (配菜)
-│   └── zkh-picker.py              # 震坤行选品分析器
+├── userscripts/                     # ★ 油猴脚本 (纯HTML下载, 不解析)
+│   ├── platform-1688.user.js        # 1688 自动翻页+保存
+│   ├── platform-jd.user.js          # 京东 HTML 下载器 (SPA模式)
+│   └── platform-zkh.user.js         # 震坤行 HTML 下载器
 │
-├── userscripts/                   # 油猴脚本 (纯HTML下载, 不解析)
-│   ├── platform-1688.user.js      # 1688 自动翻页+保存
-│   ├── platform-jd.user.js        # 京东 HTML 下载器
-│   └── platform-zkh.user.js       # 震坤行 HTML 下载器
+├── data/                            # ★ 数据目录 (按平台归档)
+│   ├── 1688/                        # 1688 采集数据
+│   ├── JD/                          # 京东采集数据
+│   └── ZKH/                         # 震坤行采集数据
 │
-├── data/                          # 数据目录 (按平台归档)
-│   ├── 1688/
-│   ├── JD/
-│   └── ZKH/
+├── pipeline/                        # 旧管道脚本 (兼容)
+│   ├── run.py                       # 统一命令行入口 (v2)
+│   ├── run1.py                      # 原 1688 搜索页管线
+│   └── run2.py                      # 原 1688 详情页管线
 │
-├── pipeline/                      # 管线入口
-│   ├── run.py                     # 统一命令行入口 (v2)
-│   ├── run1.py                    # 原 1688 搜索页管线
-│   └── run2.py                    # 原 1688 详情页管线
-│
-├── memory/                        # 项目日志
-│
-└── requirements.txt
+└── requirements.txt                 # Python 依赖
 ```
 
 ---
 
-## 快速开始
+## 🚀 快速开始
 
 ### 1. 采集数据 (油猴脚本)
 
-各平台的油猴脚本只做一件事：**模拟人类浏览 → 保存完整 HTML**。解析工作由后端 Python 适配器完成。
+各平台的油猴脚本只做一件事：**模拟人类浏览 → 保存完整 HTML**。
+解析工作由后端 Python 适配器完成。
 
 | 平台 | 脚本 | 说明 |
 |------|------|------|
@@ -78,42 +77,22 @@ PageHarvest/
 ### 2. 解析与分析
 
 ```python
-# 搜索页解析
 from platforms.zkh import ZhenKunHangAdapter
+from core.pipeline import SearchPipeline
 
+# 方式一：直接解析 HTML
 adapter = ZhenKunHangAdapter()
 with open('data/ZKH/xxx.html') as f:
-    products = adapter.parse_search(f.read(), "关键词")
+    products = adapter.parse_search(f.read(), "投光灯")
 
-# 详情页解析 (1688)
-from platforms.alibaba import AlibabaAdapter
-adapter = AlibabaAdapter()
-detail = adapter.collect_detail("732462521472")
+# 方式二：通过管线
+pipeline = SearchPipeline("震坤行", "data")
+products = pipeline.run("投光灯", html_dir="data/ZKH")
 ```
-
-或通过统一命令行：
-
-```bash
-# 搜索页
-python3 pipeline/run.py search --platform 1688 --keyword 投光灯 --html-dir data/1688/
-
-# 详情页
-python3 pipeline/run.py detail --platform 1688 --keyword 投光灯 --product-ids 732462521472
-
-# 跨平台对比
-python3 pipeline/run.py compare --keyword 投光灯 --platforms 1688,震坤行
-```
-
-### 3. 油猴脚本使用
-
-1. 安装 [Tampermonkey](https://www.tampermonkey.net/)
-2. 将 `userscripts/` 下的 `.user.js` 文件拖入浏览器安装
-3. 打开目标平台的搜索页
-4. 脚本会自动翻页、保存 HTML
 
 ---
 
-## 扩展新平台
+## 🏗️ 扩展新平台
 
 1. 在 `platforms/` 下创建目录，如 `platforms/pinduoduo/`
 2. 实现 `PlatformAdapter` 抽象基类
@@ -133,7 +112,48 @@ class NewPlatformAdapter(PlatformAdapter):
 
 ---
 
-## 平台对比
+## 📊 数据存储路径
+
+管线输出路径已改为**按平台目录**存储：
+
+| 文件类型 | 路径格式 |
+|---------|---------|
+| 搜索页 CSV | `data/{平台}/all_{品类}.csv` |
+| 详情页 CSV | `data/{平台}/top_{品类}_details.csv` |
+| 分析报告 | `data/{平台}/analysis_{品类}.txt` |
+
+---
+
+## ⚙️ 油猴脚本使用说明
+
+### 通用流程
+
+1. 安装 [Tampermonkey](https://www.tampermonkey.net/)
+2. 将 `userscripts/` 下的 `.user.js` 文件拖入浏览器安装
+3. 打开目标平台的搜索页
+4. 脚本会自动弹窗确认 → 模拟滚动 → 保存 HTML → 翻页
+
+### 震坤行 (ZKH)
+
+- 首次运行：等 20 秒让你手动跳到起始页 → 弹窗输入页码
+- 自动翻页直到结束或触发风控
+- 被风控后刷新页面，脚本从断点继续
+- 可在脚本顶部修改 `TOTAL`（总页数）和 `START_PAGE`（起始页）
+
+### 京东 (JD)
+
+- SPA 单页连续模式，不依赖 URL 翻页
+- 自适应滚动到底 → 保存 → 点击下一页 → 循环
+- 京东反爬严格，建议单次不超过 10 页，页间延迟 5~10 秒
+
+### 1688
+
+- 传统页面模式，自动翻页
+- 已有成熟采集逻辑，不动
+
+---
+
+## 🔑 平台对比
 
 | 特性 | 1688 | 京东 | 震坤行 |
 |------|------|------|--------|
@@ -141,23 +161,11 @@ class NewPlatformAdapter(PlatformAdapter):
 | 反爬强度 | 中等 | 严格 | 中等 (WAF) |
 | 每页商品数 | ~30 | ~30 | 60 |
 | 搜索页销量 | ✅ 有 | ✅ 有 | ❌ 无 |
-| 优选标签 | 实力商家/工业品牌 | — | 行家精选 |
+| 品牌标签 | 有 | 有 | 行家精选 |
 | 在线采集 | ✅ | ❌ 需浏览器 | ⚠️ WAF 拦截 |
 
 ---
 
-## 选品分析 (配菜)
+## 📝 日志
 
-基于已采集的销量降序数据，快速输出上架推荐清单：
-
-```bash
-python3 selection/zkh-picker.py --all
-```
-
-按品类/策略分文件夹输出，每份 30-50 条。
-
----
-
-## 许可证
-
-MIT
+- **2026-07-02**: 新增震坤行平台适配器；重写京东下载器为 SPA 模式；数据目录按平台归档；管线路径改为平台优先
