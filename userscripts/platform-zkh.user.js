@@ -27,35 +27,38 @@
 
     // ===== 主流程 =====
     (async function() {
-        let currentPage = parseInt(GM_getValue(stateKey, '0'));
+        // 读上次进度（仅用于提示，每次都需要用户确认当前页）
+        const lastPage = parseInt(GM_getValue(stateKey, '0'));
 
-        if (currentPage > TOTAL) {
+        if (lastPage > TOTAL) {
             console.log('[ZKH-DL] ★ 已完成 ' + TOTAL + ' 页');
             return;
         }
 
-        // 首次运行：等20秒让你手选页面，再输入页码
-        if (currentPage === 0) {
-            console.log('[ZKH-DL] ⏳ 等 ' + (PRE_WAIT / 1000) + ' 秒，请先手动翻到起始页...');
-            for (let i = PRE_WAIT / 1000; i > 0; i--) {
-                if (i % 5 === 0 || i <= 3) console.log('[ZKH-DL] ⏳ ' + i + 's');
-                await sleep(1000);
-            }
-
-            const input = prompt(
-                '【震坤行 自动下载】\n\n' +
-                '关键词: ' + decodeURIComponent(keyword) + '\n' +
-                '请确认当前页面是第几页：\n' +
-                '(脚本将从这一页开始，自动翻到第 ' + TOTAL + ' 页)',
-                '1'
-            );
-            if (!input) { console.log('[ZKH-DL] 取消'); return; }
-            currentPage = parseInt(input);
-            if (isNaN(currentPage) || currentPage <= 0) { console.log('[ZKH-DL] 无效'); return; }
-            GM_setValue(stateKey, '' + currentPage);
-        } else {
-            console.log('[ZKH-DL] 继续第 ' + currentPage + ' 页');
+        // 每次运行都弹窗：让用户手动翻到当前页后输入页码
+        // 因为反爬刷新后总在第1页，脚本不能假设翻页进度
+        console.log('[ZKH-DL] ⏳ 等 ' + (PRE_WAIT / 1000) + ' 秒，请先手动翻到起始页...');
+        for (let i = PRE_WAIT / 1000; i > 0; i--) {
+            if (i % 5 === 0 || i <= 3) console.log('[ZKH-DL] ⏳ ' + i + 's');
+            await sleep(1000);
         }
+
+        const defaultPage = lastPage > 0 ? '' + lastPage : '1';
+        const hint = lastPage > 0
+            ? '(上次采集到第 ' + lastPage + ' 页，请手动翻到当前页面后输入页码)'
+            : '(脚本将从这一页开始，自动翻到第 ' + TOTAL + ' 页)';
+
+        const input = prompt(
+            '【震坤行 自动下载】\n\n' +
+            '关键词: ' + decodeURIComponent(keyword) + '\n' +
+            '请确认当前页面是第几页：\n' +
+            hint,
+            defaultPage
+        );
+        if (!input) { console.log('[ZKH-DL] 取消'); return; }
+        let currentPage = parseInt(input);
+        if (isNaN(currentPage) || currentPage <= 0) { console.log('[ZKH-DL] 无效'); return; }
+        GM_setValue(stateKey, '' + currentPage);
 
         // ===== 主循环 =====
         for (let page = currentPage; page <= TOTAL; page++) {

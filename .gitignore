@@ -10,12 +10,11 @@ chromedriver-win32/
 chrome_profile/
 .wdm_cache/
 
-# 数据目录（不提交原始采集文件）
-data/**/*
-!data/**/*.csv
-!data/**/*.txt
-!data/**/*.png
-data/_debug_*
+# 数据目录（全部不提交）
+data/
+
+# 项目日志（不提交）
+memory/
 
 # Python
 .vscode/
