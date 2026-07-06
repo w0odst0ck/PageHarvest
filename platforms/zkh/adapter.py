@@ -27,7 +27,8 @@ class ZhenKunHangAdapter(PlatformAdapter):
         return f"https://www.zkh.com/search.html?keywords={params}&page={page}"
 
     def product_url(self, product_id: str) -> str:
-        return f"https://www.zkh.com/item/{product_id}.html"
+        # /product/detail/ 路由无 WAF（React SPA），优先使用
+        return f"https://www.zkh.com/product/detail/{product_id}.html"
 
     # ── 采集 ──
 
@@ -47,6 +48,14 @@ class ZhenKunHangAdapter(PlatformAdapter):
             return resp.read().decode('utf-8', errors='replace')
 
     def collect_detail(self, product_id: str) -> str:
+        """采集 ZKH 详情页。
+
+        /product/detail/ 路径无 WAF 但返回 React SPA 壳页面（无商品数据），
+        真实数据由浏览器通过登录态 API 加载。
+
+        此方法返回 SPA HTML（供检查），完整渲染需使用 Playwright:
+            python -m platforms.zkh.collect_detail {product_id}
+        """
         url = self.product_url(product_id)
         req = urllib.request.Request(
             url,
@@ -69,4 +78,27 @@ class ZhenKunHangAdapter(PlatformAdapter):
         return raw_to_unified(parse_search_html(html, keyword))
 
     def parse_detail(self, html: str) -> Optional[UnifiedDetail]:
-        return None
+        """解析 ZKH 详情页 HTML。
+
+        要求输入为浏览器渲染后的完整 HTML（含商品数据）。
+        SPA 壳页面（/product/detail/ 直接请求）不含商品数据，返回 None。
+
+        图片 CDN 基础地址: https://private.zkh.com/PRODUCT/BIG/
+        """
+        # 检测 WAF 拦截
+        if 'aliyun_waf' in html or len(html) < 20000:
+            return None
+
+        # 检测是否为 SPA 壳（无商品数据）
+        if 'proGroupNo' not in html and 'sku-number' not in html and '<title>震坤行工业超市' in html:
+            return None
+
+        try:
+            from .detail_parser import parse_detail, to_unified_detail
+            result = parse_detail(html)
+            detail_dict = to_unified_detail(result)
+            return UnifiedDetail(**detail_dict)
+        except Exception as e:
+            logger = __import__('logging').getLogger(__name__)
+            logger.warning("ZKH 详情解析失败: %s", e)
+            return None

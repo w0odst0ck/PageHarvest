@@ -397,6 +397,16 @@ def main():
         print(f"  输出目录: {output_dir}/")
         print(f"{'='*55}")
 
+    # ── 赛后总结（复用 auto_pick 的分析能力）──
+    if len(categories) > 0:
+        try:
+            from selection.auto_pick import summarize_selection, print_summary
+            summary = summarize_selection(output_dir)
+            print()
+            print_summary(summary)
+        except Exception:
+            pass  # 不影响主流程
+
     print("\n✅ 分析完成")
 
 
