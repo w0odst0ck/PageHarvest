@@ -2,14 +2,17 @@
 京东适配器（搜索页 + 详情页）
 """
 
-import os, requests, time
+import os, requests, time, logging
 from typing import Optional
 from urllib.parse import quote
+
+logger = logging.getLogger(__name__)
 
 from core.schema import UnifiedProduct, UnifiedDetail
 from platforms.base import PlatformAdapter
 from core.registry import register
 from .search_parser import parse_search_html, raw_to_unified
+from .detail_parser import parse_detail as parse_jd_detail, to_unified_detail
 
 
 @register("京东")
@@ -40,26 +43,33 @@ class JDAdapter(PlatformAdapter):
     def collect_search(self, keyword: str, page: int = 1) -> str:
         """
         采集京东搜索页 HTML。
-        京东是 React SPA，直接 requests 拿到的 HTML 不含渲染后的商品数据。
-        实际使用推荐：
-          1. 油猴脚本翻页保存渲染后 HTML（与1688方案一致）
-          2. 或用 Selenium 渲染后保存
-          3. 或解析 JS 加载的 JSON 接口
+
+        ⚠ 在线采集不适用：京东搜索页是 React SPA，requests 只能拿到 SPA 壳，
+           不含渲染后的商品数据。
+
+        正确方式：浏览器打开 search.jd.com/Search?keyword=xxx →
+                  滚动到商品显示完毕 → 右键另存为 HTML（渲染后完整的）
         """
         headers = {
             'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
                            'AppleWebKit/537.36 (KHTML, like Gecko) '
                            'Chrome/120.0.0.0 Safari/537.36'),
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
         }
         resp = requests.get(self.search_url(keyword, page), headers=headers, timeout=30)
         resp.encoding = 'utf-8'
-        time.sleep(0.5)
-        return resp.text
+        return resp.text  # 注意：这是 SPA 壳 HTML，不含商品数据
 
     def collect_detail(self, product_id: str) -> str:
-        """采集京东详情页 HTML"""
+        """
+        采集京东详情页 HTML。
+
+        ⚠ 在线采集不适用：京东详情页信息分布在多个异步接口中，
+           requests 拿到的 HTML 不含渲染后的完整数据。
+
+        正确方式：浏览器打开 item.jd.com/{product_id}.html →
+                  等待页面完全加载 → 右键另存为 HTML
+        """
         headers = {
             'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
                            'AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -67,8 +77,7 @@ class JDAdapter(PlatformAdapter):
         }
         resp = requests.get(self.product_url(product_id), headers=headers, timeout=30)
         resp.encoding = 'utf-8'
-        time.sleep(0.5)
-        return resp.text
+        return resp.text  # 注意：是未渲染的原始 HTML
 
     # ── 解析 ──
 
@@ -82,56 +91,22 @@ class JDAdapter(PlatformAdapter):
 
     def parse_detail(self, html: str) -> Optional[UnifiedDetail]:
         """
-        京东详情页解析（基础版）。
-        京东详情页信息分布在多个异步接口中，完整解析需要：
-          1. 页面 HTML 中的 window.pageConfig
-          2. p.3.cn 价格接口
-          3. 商品描述接口
-        此为初步实现，后续可按需增强。
+        京东详情页解析，使用 detail_parser 模块。
         """
-        from bs4 import BeautifulSoup
-        import json, re as _re
-
-        soup = BeautifulSoup(html, 'html.parser')
-
-        # 尝试从 pageConfig 提取 sku
-        sku = ''
-        scripts = soup.find_all('script')
-        for script in scripts:
-            if script.string and 'pageConfig' in script.string:
-                m = _re.search(r'"sku"\s*:\s*"(\d+)"', script.string)
-                if m:
-                    sku = m.group(1)
-                    break
-
-        # 标题
-        title_el = soup.find('title')
-        title = title_el.get_text(strip=True) if title_el else ''
-        # 去除 "- 京东" 后缀
-        title = _re.sub(r'\s*[-–—]\s*京东$', '', title)
-
-        # 价格（简单提取）
-        price = 0.0
-        price_el = soup.find('span', class_='price')
-        if price_el:
-            m = _re.search(r'[\d.]+', price_el.get_text())
-            if m:
-                price = float(m.group())
-
-        detail = UnifiedDetail(
-            platform="京东",
-            product_id=sku,
-            product_url=self.product_url(sku) if sku else '',
-            title=title,
-            price_min=price,
-            price_max=price,
-            raw_data={'html_saved': True},
-        )
-        return detail
+        try:
+            jd = parse_jd_detail(html)
+            unified_dict = to_unified_detail(jd)
+            # 填充 product_url
+            if jd.product_id:
+                unified_dict['product_url'] = self.product_url(jd.product_id)
+            return UnifiedDetail(**unified_dict)
+        except Exception as e:
+            logger.error(f"京东详情解析异常: {e}")
+            return None
 
     # ── 能力声明 ──
 
     @property
     def capabilities(self) -> set[str]:
-        """京东搜索页采集依赖浏览器渲染，详情解析为初步"""
-        return {"search"}
+        """京东搜索页采集依赖浏览器渲染，详情解析支持离线 HTML"""
+        return {"search", "detail"}

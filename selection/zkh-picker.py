@@ -22,6 +22,8 @@
 import os, sys, re, json, csv
 from collections import Counter, defaultdict
 
+from selection.selection_schema import STRATEGY_LIMITS, STRATEGY_ORDER
+
 
 # ═══════════════════════════════════════════════════════════════
 #  1. HTML 解析
@@ -197,13 +199,8 @@ def analyze_category(name: str, html_dir: str, output_dir: str):
         classified.append(p)
 
     # ── 按策略分文件输出（每个品类一个子目录） ──
-    strategy_limits = {
-        '🔥 必上': 999,   # 全要
-        '👍 推荐': 15,
-        '💡 暗马': 10,
-        '📌 关注': 5,
-        '🔹 补充': 0,     # 不要
-    }
+    strategy_limits = STRATEGY_LIMITS.copy()
+    strategy_limits['🔹 补充'] = 0
 
     cat_dir = os.path.join(output_dir, name)
     os.makedirs(cat_dir, exist_ok=True)
@@ -211,7 +208,7 @@ def analyze_category(name: str, html_dir: str, output_dir: str):
     list_fields = ['排名', '品牌', '标题', '价格', '型号', '行家精选', '页码', '图片数', '链接']
     total_shown = 0
 
-    for strategy_tag in ['🔥 必上', '👍 推荐', '💡 暗马', '📌 关注']:
+    for strategy_tag in STRATEGY_ORDER:
         limit = strategy_limits[strategy_tag]
         if limit == 0:
             continue
@@ -243,8 +240,8 @@ def analyze_category(name: str, html_dir: str, output_dir: str):
 
     # ── 汇总合并（选品推荐合集，控制在40-50条） ──
     merge = []
-    for strategy_tag in ['🔥 必上', '👍 推荐', '💡 暗马', '📌 关注']:
-        limit = {'🔥 必上': 999, '👍 推荐': 15, '💡 暗马': 10, '📌 关注': 5}[strategy_tag]
+    for strategy_tag in STRATEGY_ORDER:
+        limit = STRATEGY_LIMITS[strategy_tag]
         if limit == 0: continue
         for p in classified:
             if p['_strategy'] == strategy_tag:
@@ -271,63 +268,53 @@ def analyze_category(name: str, html_dir: str, output_dir: str):
     print(f"      00-选品推荐合集.csv: {len(merge)} 条")
     print(f"      → 共 {total_shown} 个值得上架的商品")
 
-    # ── 输出分析报告 ──
+    # ── 输出分析报告（同步 selection_schema 模板格式） ──
     report_path = os.path.join(output_dir, f'选品分析_{name}.txt')
     with open(report_path, 'w', encoding='utf-8') as f:
-        f.write(f"═══════════════════════════════════════════\n")
-        f.write(f"  震坤行选品分析 — {name}\n")
-        f.write(f"  共 {total} 个商品, 行家精选 {len(experts)} 个\n")
-        f.write(f"═══════════════════════════════════════════\n\n")
-
-        # 策略统计
-        strat = Counter(p['_strategy'] for p in classified if p['_priority'] <= 5)
-        f.write("【上架策略分布】\n")
-        for s, n in strat.most_common():
-            f.write(f"  {s}: {n}\n")
-
-        # 品牌TOP
-        brands = Counter(p['brand'] for p in all_products if p['brand'])
-        f.write(f"\n【品牌TOP20 (共{len(brands)}个)】\n")
-        f.write(f"  {'品牌':<16} {'数量':>5} {'占比':>6} {'精选':>5}\n")
-        f.write(f"  {'-'*35}\n")
-        for b, n in brands.most_common(20):
-            e = sum(1 for p in all_products if p['brand'] == b and '行家精选' in p['tags'])
-            f.write(f"  {b:<16} {n:>5} {n/total*100:>5.1f}% {'⭐' + str(e) if e else '':>6}\n")
-
-        # 精选品牌
-        expert_brands = Counter(p['brand'] for p in experts if p['brand'])
-        if expert_brands:
-            f.write(f"\n【行家精选品牌TOP】\n")
-            for b, n in expert_brands.most_common(10):
-                f.write(f"  {b:<16} {n} 个\n")
-
-        # 价格区间
+        f.write(f"震坤行选品分析报告 — {name}\n")
+        f.write("=" * 50 + "\n\n")
+        f.write("【概览】\n")
+        f.write(f"  商品总数:   {total}\n")
+        f.write(f"  推荐上架:   {total_shown} 个\n")
+        f.write(f"  行家精选:   {len(experts)} 个\n")
         prices = [p['price'] for p in all_products if p['price'] > 0]
         if prices:
-            prices.sort()
-            f.write(f"\n【价格区间】\n")
-            f.write(f"  最低: ¥{prices[0]:.2f}\n")
-            f.write(f"  最高: ¥{prices[-1]:.2f}\n")
-            f.write(f"  中位: ¥{prices[len(prices)//2]:.2f}\n")
-            f.write(f"  平均: ¥{sum(prices)/len(prices):.2f}\n")
+            f.write(f"  价格区间:   ¥{min(prices):.2f} ~ ¥{max(prices):.2f}\n")
+            f.write(f"  均价:       ¥{sum(prices)/len(prices):.2f}\n")
+        f.write(f"  品牌数:     {len(Counter(p['brand'] for p in all_products if p['brand']))}\n\n")
 
-        # 精推行家精选产品（前3页）
-        hot_experts = [p for p in classified if '行家精选' in p['tags'] and p['_page'] <= 3]
-        if hot_experts:
-            f.write(f"\n【🔥 首推行家精选（前3页）】\n")
-            f.write(f"  {'排名':>5} {'品牌':<14} {'价格':>8}\n")
-            for p in hot_experts[:20]:
-                f.write(f"  {p['_rank']:>5} {p['brand']:<14} ¥{p['price']:>6.2f}\n")
+        # 推荐上架分布（实际输出数量）
+        strat_shown = Counter(p['_strategy'] for p in merge)
+        f.write("【推荐上架分布】\n")
+        for tag in STRATEGY_ORDER:
+            c = strat_shown.get(tag, 0)
+            if c:
+                f.write(f"  {tag}: {c} 个\n")
+        f.write("\n")
 
-        # 暗马
-        dark_horses = [p for p in classified if p['_priority'] == 3]
-        if dark_horses:
-            f.write(f"\n【💡 暗马精选（非行家精选但前3页）】\n")
-            f.write(f"  {'排名':>5} {'品牌':<14} {'价格':>8}\n")
-            for p in dark_horses[:20]:
-                f.write(f"  {p['_rank']:>5} {p['brand']:<14} ¥{p['price']:>6.2f}\n")
+        # 品牌TOP
+        brand_counts = Counter(p['brand'] for p in all_products if p['brand'])
+        f.write("【品牌TOP10】\n")
+        for b, n in brand_counts.most_common(10):
+            e = sum(1 for p in all_products if p['brand'] == b and '行家精选' in p['tags'])
+            star = f' ⭐{e}' if e else ''
+            f.write(f"  {b:<16} {n:3} 个{star}\n")
+        f.write("\n")
 
-        f.write(f"\n═══════════════════════════════════════════\n")
+        # 按策略分组
+        by_strat = {t: [p for p in merge if p['_strategy'] == t] for t in STRATEGY_ORDER}
+        for tag in ["🔥 必上", "💡 暗马"]:
+            items = by_strat.get(tag, [])
+            if items:
+                label = "🔥 必上清单" if tag == "🔥 必上" else "💡 暗马精选"
+                f.write(f"【{label}】\n")
+                for p in items:
+                    expert = '⭐' if '行家精选' in p['tags'] else ''
+                    f.write(f"  ¥{p['price']:>7.2f}  {p['brand']:12}  {p['title'][:40]}\n")
+                f.write("\n")
+
+        f.write("=" * 50 + "\n")
+        f.write(f"输出目录: {output_dir}/{name}/\n")
     print(f"     报告: {report_path}")
 
     return classified

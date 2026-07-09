@@ -485,7 +485,7 @@ def _trad_extract_shop(card: Tag) -> str:
 
 
 def _trad_check_self_operated(card: Tag) -> bool:
-    """传统页自营检测：.p-icons 包含"自营""""
+    """传统页自营检测：.p-icons 包含'自营'"""
     p_icons = card.find('div', class_='p-icons')
     if p_icons:
         for span in p_icons.find_all('span'):

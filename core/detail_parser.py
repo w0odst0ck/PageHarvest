@@ -56,6 +56,10 @@ _PLATFORM_SIGNATURES: dict[str, list[str]] = {
         "re.jd.com",
         "search.jd.com",
         "item.jd.com",
+        "pageConfig",
+        "data-sku",
+        "360buyimg.com",
+        "plugin_goodsCardWrapper",
     ],
 }
 
@@ -172,6 +176,14 @@ def _parse_1688_detail(html: str) -> Optional[dict]:
     adapter = AlibabaAdapter()
     detail = adapter.parse_detail(html)
     return None if detail is None else _dataclass_to_dict(detail)
+
+
+@register_parser("京东")
+def _parse_jd_detail(html: str) -> Optional[dict]:
+    """京东详情页解析器"""
+    from platforms.jingdong.detail_parser import parse_detail as jd_parse, to_unified_detail
+    result = jd_parse(html)
+    return to_unified_detail(result)
 
 
 def _dataclass_to_dict(obj) -> dict:
