@@ -26,3 +26,13 @@ Thumbs.db
 
 # 1688库自身文件
 1688/1688/.gitignore
+
+# Sensitive config files
+*.env
+.env.*
+*.config.ini
+credentials*
+secrets*
+
+# Userscripts (may contain private tokens)
+userscripts/*.user.js
