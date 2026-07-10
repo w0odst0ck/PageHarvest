@@ -34,8 +34,6 @@ Thumbs.db
 credentials*
 secrets*
 
-# Userscripts (may contain private tokens)
-userscripts/*.user.js
 
 # 选品输出（含商品数据）
 output/

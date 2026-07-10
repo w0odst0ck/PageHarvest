@@ -4,6 +4,7 @@
 // @version      1.4
 // @description  每页滚动后下载HTML，翻页
 // @match        *://s.1688.com/selloffer/offer_search.htm*
+// @license      MIT
 // @grant        none
 // ==/UserScript==
 

@@ -4,6 +4,7 @@
 // @version      9.2
 // @description  震坤行：手动设定起始页，自动翻页下载（随机停顿 ≤5s + 手动救援）
 // @match        https://www.zkh.com/search*
+// @license      MIT
 // @grant        GM_notification
 // @grant        GM_getValue
 // @grant        GM_setValue
