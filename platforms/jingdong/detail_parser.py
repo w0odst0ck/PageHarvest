@@ -67,14 +67,20 @@ _JD_SEARCH_SIGNATURES = [
 
 # 京东详情页 item.jd.com 独有的特征（搜索页不含）
 _JD_DETAIL_SIGNATURES = [
-    r'window\.pageConfig\s*=\s*{\s*"product"',     # 商品级 pageConfig
+    # 新版 React 架构（2025+）
+    'class="attrs"',                                   # 新版属性表
+    'class="highlight-attrs"',                        # 新版高亮属性
+    'class="top-name"',                               # 新版店铺名
+    'waist-shop-title',                                # 新版进店逛逛
+    'class="expert-selection-root"',                  # 新版达人选购
+    'class="left-tabs-item"',                         # 新版左侧Tab
+    'class="SPXQ-title"',                             # 新版商品详情
+    # 旧版页面的特征
+    r'window\.pageConfig\s*=\s*{\s*["product]',      # 商品级 pageConfig
     'itemInfo-wrap',                                  # 详情页信息区
     'summary-price',                                  # 价格摘要区
     'choose-attr-',                                   # SKU 选择器
     'parameter2 p-parameter-list',                    # 参数规格表
-    '.spec-items',                                    # 图片列表
-    'J-hove-wrap',                                    # 店铺区
-    'J-sale-data',                                    # 销量区
 ]
 
 
@@ -139,7 +145,17 @@ def validate_detail_html(html: str) -> tuple[bool, str]:
     ))
     has_sku_name = '.sku-name' in html
 
+    # 新版页面特征：只要有属性表或店铺名就认为通过
+    has_new_attrs = bool(re.search(r'class="attrs"', html)) and bool(re.search(r'class="top-name"', html))
+    if has_new_attrs:
+        return True, "ok"
+
     if detail_hits < 2 and not has_page_config and not has_sku_name:
+        # 最后兜底：检查 URL 是否来自 item.jd.com
+        url_m = re.search(r'item\.jd\.com/(\d+)', html)
+        if url_m:
+            return True, "ok"
+
         reasons = []
         reasons.append(f"京东详情页特征命中 {detail_hits}/{len(_JD_DETAIL_SIGNATURES)}")
         if not has_page_config:
@@ -238,6 +254,12 @@ def parse_detail(html: str, product_id: str = "") -> JdDetail:
     # ── 7. 属性参数 ──
     _extract_attributes(soup, result)
 
+    # ── 新版页面额外提取（新版 JD 架构覆盖） ──
+    _extract_new_attributes(html, result)
+    _extract_new_shop_info(html, result)
+    _extract_new_price(html, result)
+    _extract_new_highlight_attrs(html, result)
+
     # ── 8. 销售数据 ──
     _extract_sales(soup, result)
 
@@ -273,6 +295,20 @@ def _extract_page_config(html: str, result: JdDetail):
         m = re.search(r'"sku"\s*:\s*"(\d+)"', html)
         if m:
             result.product_id = m.group(1)
+
+
+    # ── 新版页面兜底（无 pageConfig） ──
+    if not result.product_id:
+        m = re.search(r'item\.jd\.com/(\d+)', html)
+        if m:
+            result.product_id = m.group(1)
+    if not result.title:
+        m = re.search(r'<title>([^<]+)</title>', html)
+        if m:
+            title = m.group(1).strip()
+            title = re.sub(r'\s*【行情 报价 价格 评测】.*', '', title)
+            title = re.sub(r'\s*-\s*京东$', '', title)
+            result.title = title.strip()
 
 
 def _extract_title(soup, result: JdDetail):
@@ -431,6 +467,85 @@ def _extract_tags(soup, result: JdDetail):
                 "品质认证", "放心购", "企业价"]:
         if tag in text and tag not in result.tags:
             result.tags.append(tag)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  新版 JD 详情页额外提取函数（React 架构 2025+）
+# ═══════════════════════════════════════════════════════════════
+
+def _extract_new_attributes(html: str, result: JdDetail):
+    """从新版 JD 属性表提取全部属性
+
+    新版结构：
+      <div class="attrs">
+        <div class="item ">
+          <div class="label"><span class="text"> 品牌</span></div>
+          <div class="value"><div class="text" title="松下（Panasonic）">松下</div></div>
+        </div>
+      </div>
+    """
+    if 'class="attrs"' not in html:
+        return
+
+    attr_pattern = re.compile(
+        r'<div\s+class="item[^"]*">\s*'
+        r'<div\s+class="label">\s*<span\s+class="text">\s*([^<]+)\s*</span>\s*</div>\s*'
+        r'<div\s+class="value">\s*<div\s+class="text"\s+title="([^"]*)"',
+        re.DOTALL
+    )
+    for m in attr_pattern.finditer(html):
+        name = m.group(1).strip()
+        value = m.group(2).strip()
+        if name and value:
+            result.attributes[name] = value
+
+    if not result.brand and "品牌" in result.attributes:
+        result.brand = result.attributes["品牌"]
+    if not result.model and "商品编号" in result.attributes:
+        result.model = result.attributes["商品编号"]
+    if not result.product_id and "商品编号" in result.attributes:
+        result.product_id = result.attributes["商品编号"]
+
+
+def _extract_new_shop_info(html: str, result: JdDetail):
+    m = re.search(r'class="top-name"[^>]*title="([^"]*)"', html)
+    if m:
+        result.shop_name = m.group(1).strip()
+        if "京东自营" in result.shop_name or "自营" in result.shop_name:
+            result.shop_type = "自营"
+        elif "旗舰店" in result.shop_name:
+            result.shop_type = "旗舰店"
+        else:
+            result.shop_type = "第三方"
+
+
+def _extract_new_price(html: str, result: JdDetail):
+    prices = re.findall(r'<div\s+class="value">([\d.]+)</div>', html)
+    if prices:
+        vals = []
+        for p in prices:
+            try:
+                vals.append(float(p))
+            except ValueError:
+                pass
+        if vals:
+            result.price_min = min(vals)
+            result.price_max = max(vals)
+
+
+def _extract_new_highlight_attrs(html: str, result: JdDetail):
+    """提取新版高亮属性（显色指数、最大瓦数、供电方式等）"""
+    highlight = re.compile(
+        r'<div\s+class="item">\s*'
+        r'<div\s+class="title[^"]*">([^<]+)</div>\s*'
+        r'<div\s+class="desc">\s*<div\s+class="text[^"]*">([^<]+)</div>',
+        re.DOTALL
+    )
+    for m in highlight.finditer(html):
+        name = m.group(2).strip()
+        value = m.group(1).strip()
+        if name and value:
+            result.attributes[name] = value
 
 
 # ═══════════════════════════════════════════════════════════════

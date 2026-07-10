@@ -147,18 +147,6 @@ def parse_detail(html: str, product_id: str = "") -> ZkhDetail:
         return ZkhDetail()
 
     soup = BeautifulSoup(validated, "html.parser")
-
-    Args:
-        html: 浏览器渲染后的完整 HTML
-        product_id: 商品 ID（可选，自动从 HTML 推断）
-
-    Returns:
-        ZkhDetail 对象
-    """
-    if BeautifulSoup is None:
-        raise ImportError("需要安装 beautifulsoup4: pip install beautifulsoup4")
-
-    soup = BeautifulSoup(html, "html.parser")
     result = ZkhDetail(product_id=product_id)
 
     # 保存原始数据
