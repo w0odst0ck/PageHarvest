@@ -98,8 +98,55 @@ def reconstruct_image_url(src: str) -> str:
 #  主解析函数
 # ═══════════════════════════════════════════════════════════════
 
+def validate_input(html: str) -> Optional[str]:
+    """三重输入校验：拒绝其他平台 / 拒绝搜索页 / 确认 ZKH 详情页特征"""
+    if not html or len(html.strip()) < 200:
+        logger.warning("HTML 内容过短")
+        return None
+
+    # 1. 平台检测：必须是震坤行
+    zkh_signatures = [
+        "zkh.com",
+        "震坤行",
+        "private.zkh.com",
+    ]
+    if not any(sig in html for sig in zkh_signatures):
+        logger.warning("非震坤行页面，拒绝解析")
+        return None
+
+    # 2. 拒绝搜索页
+    search_signatures = [
+        'class="goods-item-wrap-new"',
+        "/search?keywords=",
+    ]
+    if any(sig in html for sig in search_signatures):
+        logger.warning("检测到搜索页特征，拒绝解析")
+        return None
+
+    # 3. 确认详情页特征
+    detail_signatures = [
+        "sku-number",
+        "sku-price-wrap-new",
+        "gallery-slick-box",
+    ]
+    if not any(sig in html for sig in detail_signatures):
+        logger.warning("缺少详情页特征，拒绝解析")
+        return None
+
+    return html
+
+
 def parse_detail(html: str, product_id: str = "") -> ZkhDetail:
-    """解析 ZKH 商品详情页 HTML。
+    """解析 ZKH 商品详情页 HTML。"""
+    if BeautifulSoup is None:
+        raise ImportError("需要安装 beautifulsoup4: pip install beautifulsoup4")
+
+    # 输入校验
+    validated = validate_input(html)
+    if validated is None:
+        return ZkhDetail()
+
+    soup = BeautifulSoup(validated, "html.parser")
 
     Args:
         html: 浏览器渲染后的完整 HTML

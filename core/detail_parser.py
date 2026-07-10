@@ -45,16 +45,13 @@ _PLATFORM_SIGNATURES: dict[str, list[str]] = {
     ],
     "1688": [
         "1688.com",
-        "aliibaba",
-        "offer_search",
-        "alibaba_parser",
-        "detail.1688.com",
+        "detail.1688.com/offer/",
+        "module-od-product-attributes",
+        "ant-descriptions-item-label",
+        "cbu01.alicdn.com",
     ],
     "京东": [
         "jd.com",
-        "京东",
-        "re.jd.com",
-        "search.jd.com",
         "item.jd.com",
         "pageConfig",
         "data-sku",
@@ -171,11 +168,10 @@ def _parse_zkh_detail(html: str) -> Optional[dict]:
 
 @register_parser("1688")
 def _parse_1688_detail(html: str) -> Optional[dict]:
-    """1688 详情页解析器（复用 adapter 逻辑）"""
-    from platforms.alibaba.adapter import AlibabaAdapter
-    adapter = AlibabaAdapter()
-    detail = adapter.parse_detail(html)
-    return None if detail is None else _dataclass_to_dict(detail)
+    """1688 详情页解析器（专用解析器）"""
+    from platforms.alibaba.detail_parser import parse_detail as ali_parse, to_unified_detail
+    result = ali_parse(html)
+    return to_unified_detail(result)
 
 
 @register_parser("京东")
