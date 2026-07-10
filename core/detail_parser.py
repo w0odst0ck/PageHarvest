@@ -271,18 +271,38 @@ def main():
                 print(f"  ❌ {fname[:50]:50} 解析失败")
 
         # 输出
-        if args.output:
-            os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
-            fieldnames = ["file", "platform", "product_id", "title", "brand", "spec",
-                          "price", "price_max", "attributes", "sku_count", "image_count", "status"]
-            with open(args.output, "w", newline="", encoding="utf-8-sig") as f:
-                w = csv.DictWriter(f, fieldnames=fieldnames)
-                w.writeheader()
-                w.writerows(results)
-            print(f"\n📁 已保存: {args.output}")
-        else:
-            ok = sum(1 for r in results if r["status"] == "OK")
-            print(f"\n📊 {ok}/{len(results)} 成功")
+        out_dir = os.path.dirname(args.output) if args.output else args.target
+        out_dir = out_dir or "."
+
+        # CSV 汇总
+        csv_path = os.path.join(out_dir, "parsed_summary.csv")
+        fieldnames = ["file", "platform", "product_id", "title", "brand", "spec",
+                      "price", "price_max", "attributes", "sku_count", "image_count", "status"]
+        with open(csv_path, "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.DictWriter(f, fieldnames=fieldnames)
+            w.writeheader()
+            w.writerows(results)
+        print(f"\n📁 CSV 汇总: {csv_path}")
+
+        # 每商品完整 JSON
+        parsed_dir = os.path.join(out_dir, "_parsed")
+        os.makedirs(parsed_dir, exist_ok=True)
+        for fpath, r in zip(html_files, results):
+            if r["status"] != "OK":
+                continue
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                html = f.read()
+            detail = parse_detail(html, platform=args.platform)
+            if detail:
+                data = _dataclass_to_dict(detail)
+                safe_id = detail.product_id or os.path.splitext(r["file"])[0]
+                json_path = os.path.join(parsed_dir, f"{safe_id}.json")
+                with open(json_path, "w", encoding="utf-8") as jf:
+                    json_module.dump(data, jf, ensure_ascii=False, indent=2)
+                print(f"  📄 JSON: {json_path}")
+
+        ok = sum(1 for r in results if r["status"] == "OK")
+        print(f"\n📊 {ok}/{len(results)} 成功")
         return
 
     # ── 单文件模式 ──
