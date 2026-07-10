@@ -35,5 +35,11 @@ credentials*
 secrets*
 
 
+# 产品规划（内部文档）
+PLAN.md
+
+# 教程（内部文档）
+教程/
+
 # 选品输出（含商品数据）
 output/
