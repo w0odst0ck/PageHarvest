@@ -274,6 +274,8 @@ def main():
         out_dir = os.path.dirname(args.output) if args.output else args.target
         out_dir = out_dir or "."
 
+        os.makedirs(out_dir, exist_ok=True)
+
         # CSV 汇总
         csv_path = os.path.join(out_dir, "parsed_summary.csv")
         fieldnames = ["file", "platform", "product_id", "title", "brand", "spec",
@@ -290,13 +292,15 @@ def main():
         for fpath, r in zip(html_files, results):
             if r["status"] != "OK":
                 continue
+            safe_id = r["product_id"] or os.path.splitext(r["file"])[0]
+            json_path = os.path.join(parsed_dir, f"{safe_id}.json")
+            if os.path.exists(json_path):
+                continue  # 避免重复解析
             with open(fpath, "r", encoding="utf-8", errors="replace") as f:
                 html = f.read()
             detail = parse_detail(html, platform=args.platform)
             if detail:
                 data = _dataclass_to_dict(detail)
-                safe_id = detail.product_id or os.path.splitext(r["file"])[0]
-                json_path = os.path.join(parsed_dir, f"{safe_id}.json")
                 with open(json_path, "w", encoding="utf-8") as jf:
                     json_module.dump(data, jf, ensure_ascii=False, indent=2)
                 print(f"  📄 JSON: {json_path}")
