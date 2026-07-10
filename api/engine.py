@@ -1,0 +1,436 @@
+"""
+PageHarvest API — 封装层
+
+所有底层引擎（picker、parser）通过子进程调用，API 层不导入任何原工程模块。
+这是产品与底层代码的唯一接口，底层代码不可通过产品修改。
+"""
+
+import os
+import sys
+import io
+import re
+import json
+import uuid
+import shutil
+import zipfile
+import tempfile
+import subprocess
+import logging
+from pathlib import Path
+from dataclasses import dataclass, field
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+
+# ── 路径 ──
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parent          # 项目根
+PICKER_DIR = ROOT / "selection"
+PLATFORM_DIR = ROOT / "platforms"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  作业管理（每次请求一个 job_id，输出到独立临时目录）
+# ═══════════════════════════════════════════════════════════════
+
+class Job:
+    """一次 API 调用对应一个作业"""
+
+    def __init__(self):
+        self.job_id = uuid.uuid4().hex[:12]
+        self.work_dir = Path(tempfile.mkdtemp(prefix=f"ph_{self.job_id}_"))
+        self.extract_dir = self.work_dir / "input"
+        self.output_dir = self.work_dir / "output"
+
+    def extract_zip(self, zip_bytes: bytes) -> list[Path]:
+        """解压上传的 ZIP 到 input/ 目录，返回 HTML 文件列表"""
+        self.extract_dir.mkdir(parents=True, exist_ok=True)
+        zip_path = self.work_dir / "upload.zip"
+        zip_path.write_bytes(zip_bytes)
+
+        with zipfile.ZipFile(zip_path, "r") as z:
+            z.extractall(self.extract_dir)
+
+        html_files = sorted(self.extract_dir.rglob("*.html"))
+        return html_files
+
+    def detect_platform(self, html: str) -> str:
+        """从 HTML 内容检测平台"""
+        if "detail.1688.com" in html or ("1688.com" in html and "cbu01.alicdn.com" in html):
+            return "1688"
+        if "zkh.com" in html:
+            return "震坤行"
+        if "item.jd.com" in html or ('class="attrs"' in html and 'class="top-name"' in html):
+            return "京东"
+        if "s.1688.com" in html or "1688.com" in html:
+            return "1688"
+        if "search.jd.com" in html or "360buyimg.com" in html:
+            return "京东"
+        if "zkh.com/search" in html:
+            return "震坤行"
+        return "未知"
+
+    def detect_page_type(self, html: str) -> str:
+        """检测页面类型：search / detail / unknown"""
+        if any(sig in html for sig in [
+            "detail.1688.com/offer/", "module-od-product-attributes",
+            "item.jd.com/", 'class="attrs"', "sku-number", "gallery-slick-box",
+        ]):
+            return "detail"
+        if any(sig in html for sig in [
+            "goods-item-wrap-new", "offer_search.htm",
+            "search.jd.com", "s.1688.com", "zkh.com/search",
+        ]):
+            return "search"
+        return "unknown"
+
+    def cleanup(self):
+        """清理作业临时目录"""
+        shutil.rmtree(self.work_dir, ignore_errors=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  API：搜索页选品分析
+# ═══════════════════════════════════════════════════════════════
+
+@dataclass
+class SearchResult:
+    csv_content: str = ""
+    txt_content: str = ""
+    platform: str = ""
+    product_count: int = 0
+    error: str = ""
+
+
+def run_search_pipeline(html_files: list[Path], job: Job) -> SearchResult:
+    """搜索页选品分析 → 子进程调原始 picker"""
+    result = SearchResult()
+
+    if not html_files:
+        result.error = "未找到 HTML 文件"
+        return result
+
+    with open(html_files[0], "r", encoding="utf-8", errors="replace") as f:
+        sample = f.read()
+    platform = job.detect_platform(sample)
+    result.platform = platform
+
+    # 创建输出目录
+    out_dir = job.output_dir / "search"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        if platform == "1688":
+            # 自动判断数据来源：有 XLSX 就走 XLSX，否则用 HTML
+            has_xlsx = bool(list(job.extract_dir.rglob("*.xlsx")))
+            cmd = [sys.executable, "-m", "selection.1688-picker",
+                   str(job.extract_dir), "--name", "品类", "--output", str(out_dir)]
+            if not has_xlsx:
+                cmd.append("--from-html")
+            proc = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=180, cwd=str(ROOT),
+            )
+
+        elif platform == "震坤行":
+            proc = subprocess.run(
+                [sys.executable, "-m", "selection.zkh-picker",
+                 str(job.extract_dir), "--name", "品类", "--output", str(out_dir)],
+                capture_output=True, text=True, timeout=180, cwd=str(ROOT),
+            )
+
+        elif platform == "京东":
+            # JD picker 需要 CSV，先解析 HTML 转 CSV
+            from platforms.jingdong.search_parser import parse_search_html, raw_to_unified
+            all_raw = []
+            for fp in html_files:
+                with open(fp, "r", encoding="utf-8", errors="replace") as f:
+                    all_raw.extend(parse_search_html(f.read(), ""))
+
+            if not all_raw:
+                result.error = "未提取到商品数据"
+                return result
+
+            products = raw_to_unified(all_raw)
+            tmp_csv = out_dir / "_input.csv"
+            import pandas as pd
+            pd.DataFrame([{
+                "brand": p.brand, "title": p.title,
+                "price_min": p.price_min, "price_max": p.price_max,
+                "sales_text": p.sales_text, "product_url": p.product_url,
+                "is_self_operated": str(p.is_self_operated),
+            } for p in products]).to_csv(tmp_csv, index=False, encoding="utf-8-sig")
+
+            proc = subprocess.run(
+                [sys.executable, "-m", "selection.jd-picker",
+                 str(tmp_csv), "--name", "品类", "--output", str(out_dir)],
+                capture_output=True, text=True, timeout=180, cwd=str(ROOT),
+            )
+
+        else:
+            result.error = f"暂不支持平台: {platform}"
+            return result
+
+        if proc.returncode != 0:
+            result.error = proc.stderr or proc.stdout or "选品分析失败"
+            return result
+
+        # 读取结果
+        cat_dir = out_dir / "品类"
+        if not cat_dir.is_dir():
+            result.error = "未生成结果文件"
+            return result
+
+        summary_file = cat_dir / "00-选品推荐合集.csv"
+        if summary_file.exists():
+            result.csv_content = summary_file.read_text(encoding="utf-8-sig")
+            import pandas as pd
+            df = pd.read_csv(io.StringIO(result.csv_content))
+        else:
+            import pandas as pd
+            parts = []
+            for tag in ["🔥 必上", "👍 推荐", "💡 暗马", "📌 关注"]:
+                fp = cat_dir / f"{tag}.csv"
+                if fp.exists():
+                    parts.append(pd.read_csv(fp, encoding="utf-8-sig"))
+            if parts:
+                df = pd.concat(parts, ignore_index=True)
+                buf = io.StringIO()
+                df.to_csv(buf, index=False, encoding="utf-8-sig")
+                result.csv_content = buf.getvalue()
+            else:
+                result.error = "未找到选品结果"
+                return result
+
+        result.product_count = len(df)
+
+        # TXT 报告
+        lines = [f"PageHarvest 选品分析报告 — {platform}", ""]
+        if "策略" in df.columns:
+            for tag in ["🔥 必上", "👍 推荐", "💡 暗马", "📌 关注"]:
+                subset = df[df["策略"] == tag]
+                if not subset.empty:
+                    lines.append(f"【{tag}】{len(subset)} 件")
+                    lines.append("-" * 36)
+                    for _, r in subset.iterrows():
+                        b = r.get("品牌", "")
+                        p = r.get("价格", 0)
+                        t = str(r.get("标题", ""))[:40]
+                        lines.append(f"  {str(b or '-'):8} ¥{float(p):<8.2f} {t}")
+                    lines.append("")
+
+        result.txt_content = "\n".join(lines)
+        return result
+
+    except subprocess.TimeoutExpired:
+        result.error = "选品分析超时（>180 秒）"
+        return result
+    except Exception as e:
+        result.error = f"搜索分析异常: {e}"
+        return result
+
+
+# ═══════════════════════════════════════════════════════════════
+#  API：详情页解析
+# ═══════════════════════════════════════════════════════════════
+
+@dataclass
+class DetailResult:
+    xlsx_bytes: bytes = field(default_factory=bytes)
+    csv_content: str = ""
+    product_count: int = 0
+    error: str = ""
+
+
+def run_detail_pipeline(html_files: list[Path], job: Job) -> DetailResult:
+    """详情页解析 → core.detail_parser（流式输出 Excel）"""
+    result = DetailResult()
+
+    if not html_files:
+        result.error = "未找到 HTML 文件"
+        return result
+
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill
+    except ImportError:
+        result.error = "需要 openpyxl: pip install openpyxl"
+        return result
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "商品概览"
+
+    headers = ["商品ID", "平台", "标题", "品牌", "型号", "最低价", "最高价",
+               "属性数", "SKU数", "主图数"]
+    ws.append(headers)
+    for col in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+
+    csv_rows = []
+
+    for html_path in html_files:
+        html = html_path.read_text(encoding="utf-8", errors="replace")
+        platform = job.detect_platform(html)
+
+        try:
+            proc = subprocess.run(
+                [sys.executable, "-m", "core.detail_parser", str(html_path), "--json"],
+                capture_output=True, text=True, timeout=60, cwd=str(ROOT),
+            )
+            if proc.returncode != 0:
+                ws.append([html_path.name, platform, "", "", "", "", "", "", "", "", "解析失败"])
+                continue
+
+            detail = json.loads(proc.stdout)
+
+        except (subprocess.TimeoutExpired, json.JSONDecodeError, Exception) as e:
+            ws.append([html_path.name, platform, "", "", "", "", "", "", "", "", str(e)[:60]])
+            continue
+
+        pid = detail.get("product_id", "")
+        title = detail.get("title", "")
+        brand = detail.get("brand", "")
+        spec = detail.get("spec", "")
+        pmin = detail.get("price_min", 0)
+        pmax = detail.get("price_max", 0)
+        attrs = detail.get("attributes", {})
+        sku_count = detail.get("sku_count", 0)
+        images = detail.get("main_images", [])
+
+        ws.append([pid, platform, title[:60], brand, spec, pmin, pmax,
+                   len(attrs), sku_count, len(images)])
+
+        csv_rows.append({
+            "file": html_path.name, "platform": platform, "product_id": pid,
+            "title": title, "brand": brand, "spec": spec,
+            "price_min": pmin, "price_max": pmax,
+            "attributes": len(attrs), "sku_count": sku_count,
+            "image_count": len(images), "status": "OK",
+        })
+
+        # 每商品独立 Sheet
+        safe_name = re.sub(r'[\\/*?\[\]:]', '_', f"{title[:30] or pid}")
+        sheet = wb.create_sheet(title=safe_name[:31])
+
+        info_rows = [
+            ("商品ID", pid), ("标题", title), ("品牌", brand),
+            ("型号", spec), ("最低价", pmin), ("最高价", pmax),
+        ]
+        for kv in info_rows:
+            sheet.append(kv)
+
+        sheet.append([])
+        sheet.append(["属性", "值"])
+        if attrs:
+            for k, v in attrs.items():
+                sheet.append([k, v])
+
+        if sku_count > 0:
+            sheet.append([])
+            sheet.append(["SKU 规格", "价格"])
+            for sku in detail.get("sku_matrix", []):
+                if isinstance(sku, dict):
+                    sheet.append([sku.get("spec", ""), sku.get("price", "")])
+
+        if images:
+            sheet.append([])
+            sheet.append(["主图链接"])
+            for img_url in images[:20]:
+                sheet.append([img_url])
+
+    # 列宽
+    for col in ws.columns:
+        try:
+            max_len = max(len(str(c.value or "")) for c in col)
+            ws.column_dimensions[col[0].column_letter].width = min(max_len + 2, 50)
+        except Exception:
+            pass
+
+    # CSV
+    if csv_rows:
+        import pandas as pd
+        buf = io.StringIO()
+        pd.DataFrame(csv_rows).to_csv(buf, index=False, encoding="utf-8-sig")
+        result.csv_content = buf.getvalue()
+
+    result.product_count = len(csv_rows)
+
+    # XLSX
+    xlsx_buf = io.BytesIO()
+    wb.save(xlsx_buf)
+    xlsx_buf.seek(0)
+    result.xlsx_bytes = xlsx_buf.read()
+
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════
+#  便捷方法：上传 ZIP → 自动识别 → 路由到对应 API
+# ═══════════════════════════════════════════════════════════════
+
+@dataclass
+class ApiResult:
+    success: bool = False
+    page_type: str = ""       # search / detail
+    platform: str = ""
+    product_count: int = 0
+    # 搜索页结果
+    csv_content: str = ""
+    txt_content: str = ""
+    # 详情页结果
+    xlsx_bytes: bytes = field(default_factory=bytes)
+    detail_csv: str = ""
+    error: str = ""
+
+
+def process_upload(zip_bytes: bytes) -> ApiResult:
+    """上传 ZIP → 自动识别 → 路由 → 返回结果"""
+    result = ApiResult()
+    job = Job()
+
+    try:
+        html_files = job.extract_zip(zip_bytes)
+        if not html_files:
+            result.error = "ZIP 中未找到 HTML 文件"
+            return result
+
+        with open(html_files[0], "r", encoding="utf-8", errors="replace") as f:
+            sample = f.read()
+
+        result.platform = job.detect_platform(sample)
+        result.page_type = job.detect_page_type(sample)
+
+        if result.page_type == "search":
+            sr = run_search_pipeline(html_files, job)
+            if sr.error:
+                result.error = sr.error
+                return result
+            result.success = True
+            result.csv_content = sr.csv_content
+            result.txt_content = sr.txt_content
+            result.product_count = sr.product_count
+
+        elif result.page_type == "detail":
+            dr = run_detail_pipeline(html_files, job)
+            if dr.error:
+                result.error = dr.error
+                return result
+            result.success = True
+            result.xlsx_bytes = dr.xlsx_bytes
+            result.detail_csv = dr.csv_content
+            result.product_count = dr.product_count
+
+        else:
+            result.error = f"无法识别页面类型（搜索页/详情页）"
+            return result
+
+        return result
+
+    except Exception as e:
+        result.error = str(e)
+        return result
+    finally:
+        job.cleanup()
