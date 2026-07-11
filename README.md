@@ -16,8 +16,7 @@
 
 双击 `PageHarvest.exe`，浏览器打开 `http://localhost:8080`
 
-<!-- 截图占位：首页界面 -->
-<!-- ![首页](web/static/img/screenshot-home.png) -->
+<img src="web/static/img/1.jpeg" width="700" alt="首页">
 
 ### 使用流程
 
@@ -27,8 +26,7 @@
 2. 把下载的 HTML（或采购助手 XLSX）打包成 ZIP
 3. 上传到 PageHarvest → 自动输出选品推荐清单（CSV / TXT / Excel）
 
-<!-- 截图占位：搜索页选品上传界面 -->
-<!-- ![搜索页选品](web/static/img/screenshot-search.png) -->
+<img src="web/static/img/2.jpeg" width="700" alt="搜索页选品">
 
 #### 详情页解析
 
@@ -36,8 +34,7 @@
 2. 多个页面打包成 ZIP
 3. 上传到 PageHarvest → 自动解析品牌/价格/SKU/属性/主图
 
-<!-- 截图占位：详情页解析结果界面 -->
-<!-- ![详情页解析](web/static/img/screenshot-detail.png) -->
+<img src="web/static/img/3.jpeg" width="700" alt="详情页解析">
 
 ---
 
