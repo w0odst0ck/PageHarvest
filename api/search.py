@@ -9,7 +9,7 @@ import os
 import sys
 import csv
 import io
-import subprocess
+import importlib
 import logging
 from pathlib import Path
 from dataclasses import dataclass
@@ -51,10 +51,8 @@ def _detect_category(job) -> str:
     files = job.html_files() or job.xlsx_files()
     if not files:
         return "品类"
-    name = files[0].stem  # 去掉扩展名
+    name = files[0].stem
     import re
-    # 常见模式: "灯具_商品搜索_..." "灯具 - 商品搜索 - ..." "灯具1-商品列表-..."
-    # 先尝试常见分隔符前的第一个片段
     candidates = []
     for sep in ["_", " - ", "-", " "]:
         parts = name.split(sep)
@@ -64,7 +62,6 @@ def _detect_category(job) -> str:
                 candidates.append(first)
     if candidates:
         raw = candidates[0]
-        # 去掉尾随数字（如 "灯具1" → "灯具"），但保留纯英文品牌
         cleaned = re.sub(r'\d+$', '', raw)
         if cleaned:
             return cleaned
@@ -72,9 +69,13 @@ def _detect_category(job) -> str:
     return "品类"
 
 
+def _load_picker(name: str):
+    """用 importlib 加载含连字符的 picker 模块"""
+    return importlib.import_module(f"selection.{name}")
+
+
 def run_search_pipeline(job) -> SearchResult:
-    """搜索页选品分析 → 子进程调原始 picker
-    job: Job 实例（defines html_files(), xlsx_files(), extract_dir, output_dir）"""
+    """搜索页选品分析 → 直接调 picker 函数（不经过 subprocess）"""
     result = SearchResult()
 
     # 检测平台
@@ -92,61 +93,60 @@ def run_search_pipeline(job) -> SearchResult:
         return result
     result.platform = platform
 
-    # 平台短名映射（用于输出目录）
     _PLATFORM_DIR = {"震坤行": "ZKH", "京东": "JD", "1688": "1688"}
     platform_dir = _PLATFORM_DIR.get(platform, platform)
-
-    # 品类自动检测
     category = _detect_category(job)
-
-    # 输出目录: output/{platform_short}/{category}/搜索页/
-    # 输出目录基准（picker 会追加 {name}/搜索页/）
     out_dir = ROOT / "output" / platform_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
     try:
         if platform == "1688":
-            # 自动判断：有 XLSX 就走 XLSX，否则用 HTML
+            picker = _load_picker("1688-picker")
             has_xlsx = bool(job.xlsx_files())
-            cmd = [sys.executable, "-m", "selection.1688-picker",
-                   str(job.extract_dir), "--name", category, "--output", str(out_dir)]
-            if not has_xlsx:
-                cmd.append("--from-html")
-            proc = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=180, cwd=str(ROOT),
-            )
+
+            if has_xlsx:
+                import glob
+                products = []
+                for f in job.xlsx_files():
+                    p = picker.parse_xlsx(str(f))
+                    logger.info(f"  {f.name}: {len(p)} 条")
+                    products.extend(p)
+            else:
+                products = picker.parse_html_dir(str(job.extract_dir))
+
+            if not products:
+                result.error = "1688 无数据"
+                return result
+            # 去重
+            seen = set()
+            unique = []
+            for p in products:
+                pid = p.get("product_id") or p.get("title", "")
+                if pid not in seen:
+                    seen.add(pid)
+                    unique.append(p)
+
+            picker.analyze(category, unique, str(out_dir))
 
         elif platform == "震坤行":
-            proc = subprocess.run(
-                [sys.executable, "-m", "selection.zkh-picker",
-                 str(job.extract_dir), "--name", category, "--output", str(out_dir)],
-                capture_output=True, text=True, timeout=180, cwd=str(ROOT),
-            )
+            picker = _load_picker("zkh-picker")
+            picker.analyze_category(category, str(job.extract_dir), str(out_dir))
 
         elif platform == "京东":
-            # JD picker 需要 CSV，先子进程解析 HTML 转 CSV
+            # JD: HTML → CSV → picker
+            from api.jd_html2csv import convert as jd_convert
             tmp_csv = out_dir / "_input.csv"
-            convert_proc = subprocess.run(
-                [sys.executable, str(HERE / "jd_html2csv.py"),
-                 str(job.extract_dir), "-o", str(tmp_csv)],
-                capture_output=True, text=True, timeout=120, cwd=str(ROOT),
-            )
-            if convert_proc.returncode != 0:
-                result.error = f"HTML 转 CSV 失败: {convert_proc.stderr or convert_proc.stdout}"
+            count = jd_convert(str(job.extract_dir), str(tmp_csv))
+
+            if count == 0:
+                result.error = "JD HTML 转 CSV 失败"
                 return result
 
-            proc = subprocess.run(
-                [sys.executable, "-m", "selection.jd-picker",
-                 str(tmp_csv), "--name", category, "--output", str(out_dir)],
-                capture_output=True, text=True, timeout=180, cwd=str(ROOT),
-            )
+            picker = _load_picker("jd-picker")
+            picker.analyze(category, str(tmp_csv), str(out_dir))
 
         else:
             result.error = f"暂不支持平台: {platform}"
-            return result
-
-        if proc.returncode != 0:
-            result.error = proc.stderr or proc.stdout or "选品分析失败"
             return result
 
         # 读取结果
@@ -196,9 +196,8 @@ def run_search_pipeline(job) -> SearchResult:
         result.txt_content = "\n".join(lines)
         return result
 
-    except subprocess.TimeoutExpired:
-        result.error = "选品分析超时（>180 秒）"
-        return result
     except Exception as e:
         result.error = f"搜索分析异常: {e}"
+        import traceback
+        logger.error(traceback.format_exc())
         return result

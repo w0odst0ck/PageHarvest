@@ -10,12 +10,10 @@ import os
 import sys
 import io
 import re
-import json
 import uuid
 import shutil
 import zipfile
 import tempfile
-import subprocess
 import logging
 from pathlib import Path
 from dataclasses import dataclass, field
@@ -151,22 +149,38 @@ def run_detail_pipeline(html_files: list[Path], job: Job) -> DetailResult:
 
     csv_rows = []
 
+    from core.detail_parser import parse_detail as _parse_detail
+
     for html_path in html_files:
         html = html_path.read_text(encoding="utf-8", errors="replace")
         platform = job.detect_platform(html)
 
         try:
-            proc = subprocess.run(
-                [sys.executable, "-m", "core.detail_parser", str(html_path), "--json"],
-                capture_output=True, text=True, timeout=60, cwd=str(ROOT),
-            )
-            if proc.returncode != 0:
+            parsed = _parse_detail(html)
+            if parsed is None:
                 ws.append([html_path.name, platform, "", "", "", "", "", "", "", "", "解析失败"])
                 continue
 
-            detail = json.loads(proc.stdout)
+            detail = {
+                "product_id": parsed.product_id,
+                "title": parsed.title,
+                "brand": parsed.brand,
+                "spec": parsed.spec,
+                "price_min": parsed.price_min,
+                "price_max": parsed.price_max,
+                "attributes": parsed.attributes or {},
+                "sku_count": parsed.sku_count,
+                "main_images": parsed.main_images or [],
+                "sku_matrix": [],
+            }
+            # sku_matrix 从 dataclass 转 dict
+            if parsed.sku_matrix:
+                detail["sku_matrix"] = [
+                    {"spec": s.spec, "price": s.price}
+                    for s in parsed.sku_matrix
+                ]
 
-        except (subprocess.TimeoutExpired, json.JSONDecodeError, Exception) as e:
+        except Exception as e:
             ws.append([html_path.name, platform, "", "", "", "", "", "", "", "", str(e)[:60]])
             continue
 
