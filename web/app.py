@@ -209,19 +209,30 @@ def _run_detail(job_id: str, zip_bytes: bytes):
                 files_dir = html_path.parent / (html_path.stem + "_files")
                 img_urls = []
                 if files_dir.is_dir():
-                    # 持久化保存图片到 web/static/detail-images/{job_id}/
-                    img_dir = ROOT / "web" / "static" / "detail-images" / job_id
-                    img_dir.mkdir(parents=True, exist_ok=True)
-                    for img_file in sorted(files_dir.iterdir()):
-                        if img_file.suffix.lower() in (".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"):
-                            # 复制到静态目录
-                            dest = img_dir / img_file.name
-                            try:
-                                import shutil
-                                shutil.copy2(str(img_file), str(dest))
-                                img_urls.append(f"/static/detail-images/{job_id}/{img_file.name}")
-                            except Exception:
-                                pass
+                    # 只复制解析器认定的主图文件，不复制 _files/ 里的全部图片
+                    want_files = set()
+                    for p in detail.main_images:
+                        fn = Path(p).name  # 从本地化路径取出文件名
+                        if fn:
+                            want_files.add(fn)
+                    if not want_files:
+                        # 解析器没找到图，取所有常规图片（最多前 10 张）
+                        all_imgs = sorted(files_dir.iterdir())
+                        for img_file in all_imgs[:10]:
+                            if img_file.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp", ".avif"):
+                                want_files.add(img_file.name)
+                    if want_files:
+                        img_dir = ROOT / "web" / "static" / "detail-images" / job_id
+                        img_dir.mkdir(parents=True, exist_ok=True)
+                        for fname in sorted(want_files):
+                            src = files_dir / fname
+                            if src.is_file():
+                                try:
+                                    import shutil
+                                    shutil.copy2(str(src), str(img_dir / fname))
+                                    img_urls.append(f"/static/detail-images/{job_id}/{fname}")
+                                except Exception:
+                                    pass
                 if img_urls:
                     detail.main_images = img_urls
                 elif detail.main_images:
