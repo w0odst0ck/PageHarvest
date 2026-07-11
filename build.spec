@@ -7,7 +7,10 @@ PageHarvest 构建脚本
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).parent
+try:
+    ROOT = Path(__file__).resolve().parent
+except NameError:
+    ROOT = Path(sys.argv[0]).resolve().parent
 
 # 需要包含的 Python 包
 PACKAGES = ['api', 'core', 'platforms', 'selection', 'gap']
