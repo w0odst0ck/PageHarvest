@@ -149,6 +149,18 @@ def run_search_pipeline(job) -> SearchResult:
             result.error = f"暂不支持平台: {platform}"
             return result
 
+        # 调试：analyze 写入后，检查实际路径
+        print(f"    ✦ category={repr(category)}", flush=True)
+        print(f"    ✦ out_dir={out_dir}", flush=True)
+        print(f"    ✦ 期望 cat_dir={out_dir / category / '搜索页'}", flush=True)
+        print(f"    ✦ 检查 {out_dir / category}= {(out_dir / category).is_dir()}", flush=True)
+        for _p in sorted((out_dir / category).iterdir()) if (out_dir / category).is_dir() else []:
+            print(f"        {'📁' if _p.is_dir() else '📄'} {_p.name}", flush=True)
+        if (out_dir / category / "搜索页").is_dir():
+            print(f"    ✦ 搜索页/ 存在，内容:", flush=True)
+            for _p in sorted((out_dir / category / "搜索页").iterdir()):
+                print(f"        {'📁' if _p.is_dir() else '📄'} {_p.name}", flush=True)
+
         # 读取结果
         cat_dir = out_dir / category / "搜索页"
         if not cat_dir.is_dir():
