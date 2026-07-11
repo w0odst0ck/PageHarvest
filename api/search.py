@@ -152,7 +152,16 @@ def run_search_pipeline(job) -> SearchResult:
         # 读取结果
         cat_dir = out_dir / category / "搜索页"
         if not cat_dir.is_dir():
-            result.error = "未生成结果文件"
+            # 调试：看看父目录有什么
+            parent = out_dir / category
+            hint = ""
+            if parent.is_dir():
+                subs = [str(p.name) for p in sorted(parent.iterdir())]
+                hint = f"实际子目录: {subs}"
+            else:
+                hint = f"{parent} 不存在; out_dir={out_dir}"
+            result.error = f"未生成结果文件 ({hint})"
+            logger.error(result.error)
             return result
 
         summary_file = cat_dir / "00-选品推荐合集.csv"
