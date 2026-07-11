@@ -167,38 +167,42 @@ def run_search_pipeline(job) -> SearchResult:
             logger.error(result.error)
             return result
 
+        def _csv_to_list(path):
+            """读取 CSV 返回 list[dict]"""
+            with open(path, encoding="utf-8-sig", newline="") as f:
+                return list(csv.DictReader(f))
+
         summary_file = cat_dir / "00-选品推荐合集.csv"
         if summary_file.exists():
             result.csv_content = summary_file.read_text(encoding="utf-8-sig")
-            import pandas as pd
-            df = pd.read_csv(io.StringIO(result.csv_content))
+            rows = _csv_to_list(summary_file)
         else:
-            import pandas as pd
-            parts = []
+            rows = []
             for tag in ["🔥 必上", "👍 推荐", "💡 暗马", "📌 关注"]:
                 fp = cat_dir / f"{tag}.csv"
                 if fp.exists():
-                    parts.append(pd.read_csv(fp, encoding="utf-8-sig"))
-            if parts:
-                df = pd.concat(parts, ignore_index=True)
+                    rows.extend(_csv_to_list(fp))
+            if rows:
                 buf = io.StringIO()
-                df.to_csv(buf, index=False, encoding="utf-8-sig")
+                w = csv.DictWriter(buf, fieldnames=rows[0].keys())
+                w.writeheader()
+                w.writerows(rows)
                 result.csv_content = buf.getvalue()
             else:
                 result.error = "未找到选品结果"
                 return result
 
-        result.product_count = len(df)
+        result.product_count = len(rows)
 
         # TXT 报告
         lines = [f"PageHarvest 选品分析报告 — {platform}", ""]
-        if "策略" in df.columns:
+        if "策略" in (rows[0] if rows else {}):
             for tag in ["🔥 必上", "👍 推荐", "💡 暗马", "📌 关注"]:
-                subset = df[df["策略"] == tag]
-                if not subset.empty:
+                subset = [r for r in rows if r.get("策略") == tag]
+                if subset:
                     lines.append(f"【{tag}】{len(subset)} 件")
                     lines.append("-" * 36)
-                    for _, r in subset.iterrows():
+                    for r in subset:
                         b = r.get("品牌", "")
                         p = r.get("价格", 0)
                         t = str(r.get("标题", ""))[:40]

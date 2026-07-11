@@ -242,9 +242,10 @@ def run_detail_pipeline(html_files: list[Path], job: Job) -> DetailResult:
             pass
 
     if csv_rows:
-        import pandas as pd
         buf = io.StringIO()
-        pd.DataFrame(csv_rows).to_csv(buf, index=False, encoding="utf-8-sig")
+        w = csv.DictWriter(buf, fieldnames=csv_rows[0].keys())
+        w.writeheader()
+        w.writerows(csv_rows)
         result.csv_content = buf.getvalue()
 
     result.product_count = len(csv_rows)

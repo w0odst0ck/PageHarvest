@@ -36,7 +36,7 @@ a = Analysis(
     hiddenimports=[
         'flask', 'werkzeug', 'jinja2', 'markupsafe', 'click',
         'itsdangerous', 'blinker', 'flask_cors',
-        'openpyxl', 'pandas', 'bs4', 'charset_normalizer',
+        'openpyxl', 'bs4', 'charset_normalizer',
         'soupsieve', 'chardet',
     ],
     excludes=['tkinter', 'unittest', 'pdb', 'test', 'distutils',
