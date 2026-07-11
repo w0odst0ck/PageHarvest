@@ -32,12 +32,13 @@ a = Analysis(
     datas=DATAS,
     hiddenimports=[
         'flask', 'werkzeug', 'jinja2', 'markupsafe', 'click',
-        'itsdangerous', 'blinker',
+        'itsdangerous', 'blinker', 'flask_cors',
         'openpyxl', 'pandas', 'bs4', 'charset_normalizer',
-        'lxml', 'soupsieve',
+        'soupsieve', 'chardet',
     ],
     excludes=['tkinter', 'unittest', 'pdb', 'test', 'distutils',
-              'setuptools', 'pip', 'numpy', 'matplotlib', 'scipy'],
+              'setuptools', 'pip', 'numpy', 'matplotlib', 'scipy',
+              'selenium', 'undetected_chromedriver'],
     hookspath=[], hooksconfig={}, runtime_hooks=[], noarchive=False,
 )
 
