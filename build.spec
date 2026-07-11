@@ -51,4 +51,4 @@ exe = EXE(pyz, a.scripts, a.binaries, a.datas, [],
           name='PageHarvest', debug=False, bootloader_ignore_signals=False,
           strip=False, upx=True, upx_exclude=[], runtime_tmpdir=None,
           console=True, disable_windowed_traceback=False,
-          argv_emulation=False, contents_directory='_internal')
+          argv_emulation=False)
