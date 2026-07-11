@@ -35,7 +35,10 @@ ROOT = _base
 from api.engine import process_upload
 from core.detail_parser import parse_detail, detect_platform
 
-app = Flask(__name__)
+app = Flask(__name__,
+    template_folder=str(HERE / "templates"),
+    static_folder=str(HERE / "static"),
+    static_url_path="/static")
 app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024
 
 # ── 作业状态 + 结果存储（线程安全） ──
