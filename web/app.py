@@ -3,6 +3,32 @@
 搜索页选品 / 详情页解析 完全隔离。
 """
 
+# ══ 调试日志（启动时写 ph_debug.log，和 exe 同目录） ══
+import sys as _sys, pathlib as _pl
+try:
+    _dbg = _pl.Path(getattr(_sys, '_MEIPASS', str(_pl.Path(__file__).resolve().parent)))
+    _log = _dbg.parent / "ph_debug.log"
+    with open(_log, "w", encoding="utf-8") as _f:
+        _f.write(f"_MEIPASS={getattr(_sys, '_MEIPASS', 'N/A')}\n")
+        _f.write(f"__file__={__file__}\n")
+        _f.write(f"cwd={_pl.Path.cwd()}\n")
+        _f.write(f"sys.argv[0]={_sys.argv[0] if len(_sys.argv) > 0 else 'N/A'}\n")
+        _f.write(f"sys.executable={_sys.executable}\n")
+        _mp = getattr(_sys, '_MEIPASS', None)
+        if _mp:
+            _p = _pl.Path(_mp)
+            _f.write(f"\n--- _MEIPASS 第一层 ---\n")
+            for _x in sorted(_p.iterdir()):
+                _f.write(f"  {'📁' if _x.is_dir() else '📄'} {_x.name}\n")
+            _w = _p / "web"
+            if _w.is_dir():
+                _f.write(f"\n--- _MEIPASS/web/ ---\n")
+                for _x in sorted(_w.iterdir()):
+                    _f.write(f"  {'📁' if _x.is_dir() else '📄'} {_x.name}\n")
+        _f.write("\n")
+except Exception:
+    pass  # 日志不是必需的
+
 import os
 import sys
 import csv
@@ -217,14 +243,12 @@ def _run_detail(job_id: str, zip_bytes: bytes):
                 files_dir = html_path.parent / (html_path.stem + "_files")
                 img_urls = []
                 if files_dir.is_dir():
-                    # 复制 _files/ 中所有 >5KB 的图片文件
-                    # 排除 tiny 图标（按钮、箭头、favicon等），保留商品主图+介绍图
                     img_dir = ROOT / "web" / "static" / "detail-images" / job_id
                     img_dir.mkdir(parents=True, exist_ok=True)
                     for img_file in sorted(files_dir.iterdir()):
                         if img_file.suffix.lower() not in (".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"):
                             continue
-                        if img_file.stat().st_size < 5120:  # <5KB 跳过（图标类）
+                        if img_file.stat().st_size < 5120:
                             continue
                         try:
                             import shutil
@@ -232,13 +256,11 @@ def _run_detail(job_id: str, zip_bytes: bytes):
                             img_urls.append(f"/static/detail-images/{job_id}/{img_file.name}")
                         except Exception:
                             pass
-                    # 限制最多 50 张/商品（防单页几百张）
                     if len(img_urls) > 50:
                         img_urls = img_urls[:50]
                 if img_urls:
                     detail.main_images = img_urls
                 elif detail.main_images:
-                    # 解析器找到的是本地化路径（./xxx_files/xxx.jpg），尝试解析
                     resolved = []
                     for img_path in detail.main_images:
                         if img_path.startswith("./"):
@@ -318,7 +340,6 @@ def _run_detail(job_id: str, zip_bytes: bytes):
         try:
             from openpyxl import Workbook
 
-            # 构建完整的解析数据 JSON
             full_json = []
             for r in results:
                 item = {k: v for k, v in r.items() if k != "_raw"}
@@ -330,16 +351,13 @@ def _run_detail(job_id: str, zip_bytes: bytes):
                     item["_parsed"] = None
                 full_json.append(item)
 
-            # JSON 转 Excel：每行一条商品，字段展开为列
             wb = Workbook()
             ws = wb.active
             ws.title = "解析结果"
 
-            # 收集所有列
             all_cols = ["file", "platform", "product_id", "title", "brand", "spec",
                         "price_min", "price_max", "attributes_count", "sku_count",
                         "image_count", "status"]
-            # 加上 _parsed 里的顶层字段
             parsed_cols = ["ship_from", "sales_count", "yearly_sales", "repurchase_rate",
                            "listing_date", "product_code", "min_order"]
             all_cols += [f"parsed.{c}" for c in parsed_cols]
@@ -352,7 +370,7 @@ def _run_detail(job_id: str, zip_bytes: bytes):
                 for c in ["file", "platform", "product_id", "title", "brand", "spec",
                           "price_min", "price_max"]:
                     row.append(item.get(c, ""))
-                row.append(len(item.get("_parsed", {}).get("attributes", {})))  # attributes_count
+                row.append(len(item.get("_parsed", {}).get("attributes", {})))
                 row.append(item.get("sku_count", 0))
                 row.append(item.get("image_count", 0))
                 row.append(item.get("status", ""))
@@ -369,7 +387,7 @@ def _run_detail(job_id: str, zip_bytes: bytes):
             wb.save(xlsx_buf)
             xlsx_bytes = xlsx_buf.getvalue()
         except Exception:
-            pass  # Excel 可选，不强求
+            pass
 
         # 构建图片预览数据
         detail_images_preview = []
@@ -381,7 +399,7 @@ def _run_detail(job_id: str, zip_bytes: bytes):
                     "images": raw.main_images[:10],
                 })
 
-        # 构建完整解析 JSON（用于下载排查）
+        # 构建完整解析 JSON
         raw_json = []
         for r in results:
             item = {k: v for k, v in r.items() if k != "_raw"}
@@ -488,7 +506,6 @@ def download(job_id: str, fmt: str):
         return send_file(BytesIO(b), mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                          as_attachment=True, download_name=f"ph_{job_id[:8]}.xlsx")
     elif fmt == "json":
-        # 完整 JSON（含原始解析数据）
         clean = {}
         for k, v in result.items():
             if k == "_xlsx_bytes":
