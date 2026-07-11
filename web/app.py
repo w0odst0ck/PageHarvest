@@ -32,12 +32,17 @@ if str(_base) not in _sys.path:
 HERE = Path(__file__).resolve().parent
 ROOT = _base
 
+# PyInstaller 打包后 resources 在 sys._MEIPASS/web/ 下
+_WEB_DIR = ROOT / "web"
+_TEMPLATES = _WEB_DIR / "templates"
+_STATIC = _WEB_DIR / "static"
+
 from api.engine import process_upload
 from core.detail_parser import parse_detail, detect_platform
 
 app = Flask(__name__,
-    template_folder=str(HERE / "templates"),
-    static_folder=str(HERE / "static"),
+    template_folder=str(_TEMPLATES),
+    static_folder=str(_STATIC),
     static_url_path="/static")
 app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024
 
