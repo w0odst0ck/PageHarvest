@@ -37,6 +37,17 @@ _WEB_DIR = ROOT / "web"
 _TEMPLATES = _WEB_DIR / "templates"
 _STATIC = _WEB_DIR / "static"
 
+# ══ 调试：打印实际路径 ══
+print(f"✦ _MEIPASS={getattr(_sys, '_MEIPASS', 'N/A')}", flush=True)
+print(f"✦ __file__={__file__}", flush=True)
+print(f"✦ HERE={HERE}", flush=True)
+print(f"✦ ROOT={ROOT}", flush=True)
+print(f"✦ _WEB_DIR={_WEB_DIR}", flush=True)
+print(f"✦ _TEMPLATES={_TEMPLATES}", flush=True)
+print(f"✦ _TEMPLATES exists: {_TEMPLATES.is_dir()}", flush=True)
+if _TEMPLATES.is_dir():
+    print(f"✦ templates: {list(_TEMPLATES.iterdir())}", flush=True)
+
 from api.engine import process_upload
 from core.detail_parser import parse_detail, detect_platform
 
