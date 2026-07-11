@@ -23,17 +23,17 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install flask openpyxl pandas beautifulsoup4 pyinstaller
+          pip install flask openpyxl beautifulsoup4 pyinstaller
 
       - name: Build .exe
         run: |
           pyinstaller build.spec
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v7
+      - name: Upload to Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
         with:
-          name: PageHarvest-Windows
-          path: dist/PageHarvest.exe
+          files: dist/PageHarvest.exe
 
   build-linux:
     runs-on: ubuntu-latest
@@ -48,14 +48,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install flask openpyxl pandas beautifulsoup4 pyinstaller
+          pip install flask openpyxl beautifulsoup4 pyinstaller
 
       - name: Build binary
         run: |
           pyinstaller build.spec
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v7
+      - name: Upload to Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
         with:
-          name: PageHarvest-Linux
-          path: dist/PageHarvest
+          files: dist/PageHarvest
