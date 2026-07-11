@@ -13,6 +13,17 @@ chrome_profile/
 # 数据目录（全部不提交）
 data/
 
+# 构建产物
+dist/
+build/
+*.spec
+
+# Web 运行时生成
+web/static/detail-images/
+
+# 内存日志
+memory/
+
 # 项目日志（不提交）
 memory/
 

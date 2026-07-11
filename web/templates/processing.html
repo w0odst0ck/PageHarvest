@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PageHarvest — 处理中</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  {% if not error %}<meta http-equiv="refresh" content="2;url=/processing/{{ job_id }}">{% endif %}
+  <style>
+    .processing-wrap { text-align: center; padding: 80px 24px; }
+    .filename-text { color: var(--text-secondary); font-size: 14px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <a href="/" class="logo">✦ PageHarvest</a>
+      <span class="tagline">选品分析工具</span>
+    </div>
+  </header>
+  <main class="main">
+    <div class="processing-wrap">
+      {% if error %}
+        <h2 class="title" style="color:var(--danger); margin-top: 0">❌ 分析失败</h2>
+        <p class="subtitle" style="color:var(--danger)">{{ error }}</p>
+        <p><a href="/" class="link" style="margin-top:16px;display:inline-block">← 返回重试</a></p>
+      {% else %}
+        <div class="spinner"></div>
+        <h2 class="title" style="margin-top: 20px">
+          {%- if mode == 'detail' -%}正在解析详情页...
+          {%- else -%}正在分析选品...
+          {%- endif -%}
+        </h2>
+        <p class="subtitle">
+          {%- if mode == 'detail' -%}逐页解析商品属性、SKU、价格、主图
+          {%- else -%}自动识别平台，筛选高价值商品
+          {%- endif -%}
+        </p>
+        <p class="filename-text">{{ filename or '...' }}</p>
+      {% endif %}
+    </div>
+  </main>
+  <footer class="footer">
+    <span>PageHarvest — 数据不上传，一切在本地</span>
+  </footer>
+
+  {% if not error %}
+  <script>
+  (function() {
+    var jobId = '{{ job_id }}';
+    var attempts = 0;
+    function check() {
+      fetch('/progress/' + jobId)
+        .then(function(r) { return r.text(); })
+        .then(function(text) {
+          var match = text.match(/data:\s*(\{.+?\})/);
+          if (!match) { retry(); return; }
+          var data = JSON.parse(match[1]);
+          if (data.status === 'done') {
+            window.location.href = '/results/' + jobId;
+          } else if (data.status === 'error') {
+            document.querySelector('.processing-wrap').innerHTML =
+              '<h2 class="title" style="color:var(--danger)">❌ 分析失败</h2>' +
+              '<p class="subtitle" style="color:var(--danger)">' + (data.error || '未知错误') + '</p>' +
+              '<p><a href="/" class="link" style="margin-top:16px;display:inline-block">← 返回重试</a></p>';
+          } else {
+            retry();
+          }
+        })
+        .catch(function() { retry(); });
+    }
+    function retry() {
+      if (attempts++ > 120) {
+        document.querySelector('.processing-wrap').innerHTML =
+          '<h2 class="title">⏱ 处理超时</h2>' +
+          '<p class="subtitle">请检查文件是否有效，或 <a href="/" class="link">返回重试</a></p>';
+        return;
+      }
+      setTimeout(check, 1000);
+    }
+    setTimeout(check, 1000);
+  })();
+  </script>
+  {% endif %}
+</body>
+</html>

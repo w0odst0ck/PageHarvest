@@ -1,0 +1,61 @@
+# PageHarvest 构建流水线
+# 在 GitHub 上创建 Release 时自动构建 Windows/Linux 可执行文件
+# 也可以手动触发: Actions → Build → Run workflow
+
+name: Build
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install flask openpyxl pandas beautifulsoup4 pyinstaller
+
+      - name: Build .exe
+        run: |
+          pyinstaller build.spec
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PageHarvest-Windows
+          path: dist/PageHarvest.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install flask openpyxl pandas beautifulsoup4 pyinstaller
+
+      - name: Build binary
+        run: |
+          pyinstaller build.spec
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PageHarvest-Linux
+          path: dist/PageHarvest

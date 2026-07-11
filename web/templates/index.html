@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}PageHarvest — 选品分析{% endblock %}
+
+{% block content %}
+<section class="upload-section">
+  <h1 class="title">选品分析工具</h1>
+  <p class="subtitle">上传平台搜索页或详情页 ZIP 文件，自动生成分析报告</p>
+
+  <div class="mode-cards">
+    <!-- 搜索页 -->
+    <div class="mode-card">
+      <div class="mode-icon">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+      </div>
+      <h2 class="mode-title">搜索页选品</h2>
+      <p class="mode-desc">从搜索页数据中筛选高价值商品，按策略分层输出推荐清单</p>
+      <form action="/upload-search" method="post" enctype="multipart/form-data" class="mode-form">
+        <label class="btn btn-primary">
+          上传搜索页 ZIP
+          <input type="file" name="file" accept=".zip" required hidden onchange="this.form.submit()">
+        </label>
+      </form>
+    </div>
+
+    <!-- 详情页 -->
+    <div class="mode-card mode-card-accent">
+      <div class="mode-icon">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="4" y="4" width="16" height="16" rx="2"/><line x1="4" y1="10" x2="20" y2="10"/><line x1="10" y1="4" x2="10" y2="20"/>
+        </svg>
+      </div>
+      <h2 class="mode-title">详情页解析</h2>
+      <p class="mode-desc">解析商品详情页 HTML，提取属性、SKU 变体、价格、主图等结构化数据</p>
+      <form action="/upload-detail" method="post" enctype="multipart/form-data" class="mode-form">
+        <label class="btn btn-accent">
+          上传详情页 ZIP
+          <input type="file" name="file" accept=".zip" required hidden onchange="this.f">
+        </label>
+      </form>
+    </div>
+  </div>
+
+  <div class="platforms">
+    <span class="platforms-label">支持平台</span>
+    <div class="platform-badges">
+      <span class="badge">1688</span>
+      <span class="badge">震坤行</span>
+      <span class="badge">京东</span>
+    </div>
+  </div>
+</section>
+
+<script>
+document.querySelectorAll('.mode-form input[type=file]').forEach(function(input) {
+  input.addEventListener('change', function() {
+    if (this.files.length > 0) {
+      this.form.submit();
+    }
+  });
+});
+</script>
+{% endblock %}

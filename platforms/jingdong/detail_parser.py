@@ -402,18 +402,42 @@ def _extract_shop(soup, result: JdDetail):
 
 
 def _extract_images(soup, result: JdDetail):
-    """提取主图"""
+    """提取主图
+
+    尝试多种选择器兼容新旧版 JD 页面。
+    新版页面保存后图片 src 可能变为本地化路径（_files/xxx.jpg），
+    此时保留路径名供后续解析用。
+    """
     seen = set()
 
+    # 旧版 JD 选择器
     for sel in [".spec-items img", "#spec-list img", ".lh-wrap img",
                 ".preview-thumb img", ".preview-scroll img"]:
         for img in soup.select(sel):
             src = img.get("data-src") or img.get("src", "")
             if src.startswith("//"):
                 src = "https:" + src
-            if src and src not in seen and "loading" not in src.lower() and "n2/" in src:
+            if src and src not in seen and "loading" not in src.lower():
                 seen.add(src)
                 result.main_images.append(src)
+
+    # 新版 JD：spec-n1 容器（browser 保存后 src 本地化）
+    if not seen:
+        spec = soup.select_one("#spec-n1")
+        if spec:
+            for img in spec.find_all("img"):
+                src = img.get("src", "") or img.get("data-src", "")
+                if src and src not in seen and "loading" not in src.lower():
+                    seen.add(src)
+                    result.main_images.append(src)
+
+    # 兜底：从整个页面搜 360buyimg 图片链接
+    if not seen:
+        import re
+        for url in re.findall(r'https?://[^"\'\s>]+360buyimg[^"\'\s>]*\.(?:jpg|jpeg|png|webp)', str(soup)):
+            if url not in seen and "loading" not in url.lower():
+                seen.add(url)
+                result.main_images.append(url)
 
 
 def _extract_attributes(soup, result: JdDetail):

@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}PageHarvest — 分析结果{% endblock %}
+
+{% block content %}
+<section class="result-section">
+
+{% if not result %}
+<div class="loading-card">
+  <div class="spinner"></div>
+  <h2>正在加载结果...</h2>
+  <p><a href="/" class="link">返回首页</a></p>
+</div>
+{% endif %}
+
+{% if result %}
+{% set r = result %}
+
+<!-- 摘要 -->
+<div class="result-header">
+  <h1 class="title">
+    {%- if r.mode == 'detail' -%}📋 详情页解析
+    {%- else -%}📊 选品分析
+    {%- endif -%}
+  </h1>
+  <p class="subtitle">
+    {% if r.mode == 'detail' %}
+      共解析 <strong>{{ r.product_count }}</strong> 个详情页，
+      成功 <strong style="color:var(--accent)">{{ r.success_count }}</strong>，
+      失败 <strong style="color:var(--danger)">{{ r.product_count - r.success_count }}</strong>
+    {% else %}
+      平台：<strong>{{ r.platform }}</strong>
+      共 <strong>{{ r.product_count }}</strong> 件商品
+    {% endif %}
+  </p>
+</div>
+
+<!-- 操作栏 -->
+<div class="action-bar">
+  <a href="/download/{{ job_id }}/csv" class="btn btn-outline">⬇ CSV</a>
+  <a href="/download/{{ job_id }}/txt" class="btn btn-outline">⬇ 报告</a>
+  {% if r.has_xlsx %}
+  <a href="/download/{{ job_id }}/xlsx" class="btn btn-outline">⬇ Excel</a>
+  {% endif %}
+  <a href="/download/{{ job_id }}/json" class="btn btn-outline">⬇ JSON</a>
+  <a href="/" class="btn btn-secondary">↩ 新分析</a>
+</div>
+
+<!-- 报告预览 -->
+{% if r.txt_content %}
+<div class="card">
+  <div class="card-header">
+    <h2>📄 解析报告</h2>
+    <button class="btn btn-text" onclick="toggleCollapse('report-body')">展开/收起</button>
+  </div>
+  <div class="card-body collapsed" id="report-body">
+    <pre class="report-pre">{{ r.txt_content }}</pre>
+  </div>
+</div>
+{% endif %}
+
+<!-- 图片预览（仅详情页有图片时） -->
+{% if r.mode == 'detail' and result._detail_images %}
+<div class="card">
+  <div class="card-header">
+    <h2>🖼️ 商品图片</h2>
+    <span class="count-badge">{{ result._detail_images|length }} 个商品</span>
+  </div>
+  <div class="card-body">
+    {% for item in result._detail_images %}
+    <div class="product-images">
+      <p class="product-images-title">{{ item.title }}</p>
+      <div class="image-grid">
+        {% for url in item.images[:5] %}
+        <a href="{{ url }}" target="_blank" class="image-thumb">
+          <img src="{{ url }}" loading="lazy" onerror="this.parentNode.style.display='none'">
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- 数据表格（仅搜索页） -->
+{% if r.mode != 'detail' and r.table and r.table|length > 0 %}
+<div class="card">
+  <div class="card-header">
+    <h2>📊 选品清单</h2>
+    <span class="count-badge">{{ r.table|length }} 条</span>
+  </div>
+  <div class="card-body table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          {% for col in r.columns %}
+          <th>{{ col }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in r.table[:200] %}
+        <tr>
+          {% for col in r.columns %}
+          <td>
+            {%- if col == '最低价' or col == '最高价' or col == '价格' -%}
+              {% if row[col] and row[col]|float > 0 %}
+                ¥{{ row[col] }}
+              {% else %}
+                -
+              {% endif %}
+            {%- elif col == '状态' -%}
+              <span style="{% if row[col] == '✅' %}color:var(--accent){% else %}color:var(--danger){% endif %}">{{ row[col] }}</span>
+            {%- elif col == '链接' and row[col] and row[col].startswith('http') -%}
+              <a href="{{ row[col] }}" target="_blank" class="link ext">🔗</a>
+            {%- else -%}
+              {{ row[col] or '-' }}
+            {%- endif -%}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if r.table|length > 200 %}
+    <p class="table-note">仅显示前 200 条，完整数据请下载 CSV</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% endif %}
+
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleCollapse(id) {
+  var el = document.getElementById(id);
+  if (el) el.classList.toggle('collapsed');
+}
+
+{% if not result %}
+(function() {
+  var jobId = '{{ job_id }}';
+  var tries = 0;
+  function poll() {
+    fetch('/progress/' + jobId)
+      .then(function(r) { return r.text(); })
+      .then(function(text) {
+        var m = text.match(/data:\s*(\{.+?\})/);
+        if (!m) return setTimeout(poll, 1000);
+        var p = JSON.parse(m[1]);
+        if (p.status === 'done') { window.location.reload(); }
+        else if (p.status === 'error') {
+          document.querySelector('.loading-card h2').textContent = '❌ ' + (p.error || '处理失败');
+        }
+        else { setTimeout(poll, 1000); }
+      })
+      .catch(function() { setTimeout(poll, 1500); });
+  }
+  setTimeout(poll, 500);
+})();
+{% endif %}
+</script>
+{% endblock %}
