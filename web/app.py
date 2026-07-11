@@ -209,30 +209,24 @@ def _run_detail(job_id: str, zip_bytes: bytes):
                 files_dir = html_path.parent / (html_path.stem + "_files")
                 img_urls = []
                 if files_dir.is_dir():
-                    # 只复制解析器认定的主图文件，不复制 _files/ 里的全部图片
-                    want_files = set()
-                    for p in detail.main_images:
-                        fn = Path(p).name  # 从本地化路径取出文件名
-                        if fn:
-                            want_files.add(fn)
-                    if not want_files:
-                        # 解析器没找到图，取所有常规图片（最多前 10 张）
-                        all_imgs = sorted(files_dir.iterdir())
-                        for img_file in all_imgs[:10]:
-                            if img_file.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp", ".avif"):
-                                want_files.add(img_file.name)
-                    if want_files:
-                        img_dir = ROOT / "web" / "static" / "detail-images" / job_id
-                        img_dir.mkdir(parents=True, exist_ok=True)
-                        for fname in sorted(want_files):
-                            src = files_dir / fname
-                            if src.is_file():
-                                try:
-                                    import shutil
-                                    shutil.copy2(str(src), str(img_dir / fname))
-                                    img_urls.append(f"/static/detail-images/{job_id}/{fname}")
-                                except Exception:
-                                    pass
+                    # 复制 _files/ 中所有 >5KB 的图片文件
+                    # 排除 tiny 图标（按钮、箭头、favicon等），保留商品主图+介绍图
+                    img_dir = ROOT / "web" / "static" / "detail-images" / job_id
+                    img_dir.mkdir(parents=True, exist_ok=True)
+                    for img_file in sorted(files_dir.iterdir()):
+                        if img_file.suffix.lower() not in (".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"):
+                            continue
+                        if img_file.stat().st_size < 5120:  # <5KB 跳过（图标类）
+                            continue
+                        try:
+                            import shutil
+                            shutil.copy2(str(img_file), str(img_dir / img_file.name))
+                            img_urls.append(f"/static/detail-images/{job_id}/{img_file.name}")
+                        except Exception:
+                            pass
+                    # 限制最多 50 张/商品（防单页几百张）
+                    if len(img_urls) > 50:
+                        img_urls = img_urls[:50]
                 if img_urls:
                     detail.main_images = img_urls
                 elif detail.main_images:
