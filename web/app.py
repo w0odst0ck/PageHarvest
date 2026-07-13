@@ -253,7 +253,6 @@ def _run_detail(job_id: str, zip_bytes: bytes):
                             if img_file.stat().st_size < 5120:
                                 continue
                             try:
-                                import shutil
                                 shutil.copy2(str(img_file), str(img_dir / img_file.name))
                                 img_urls.append(f"/static/detail-images/{job_id}/{img_file.name}")
                             except Exception:
