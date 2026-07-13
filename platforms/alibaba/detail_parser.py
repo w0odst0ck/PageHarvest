@@ -53,7 +53,8 @@ class AlibabaDetail:
     price_max: float = 0.0
     attributes: list = field(default_factory=list)       # [AttributeItem]
     sku_variants: list = field(default_factory=list)     # [SkuVariant]
-    main_images: list = field(default_factory=list)      # [str]
+    main_images: list = field(default_factory=list)      # [str] 主图
+    detail_images: list = field(default_factory=list)    # [str] 详情描述图
     sku_count: int = 0
     description: str = ""
 
@@ -138,7 +139,10 @@ def parse_detail(html: str) -> Optional[AlibabaDetail]:
     # 7. 主图
     detail.main_images = _extract_main_images(html)
 
-    # 8. 描述
+    # 8. 详情描述图
+    detail.detail_images = _extract_detail_images(html)
+
+    # 9. 描述
     detail.description = _extract_description(html)
 
     return detail
@@ -297,34 +301,139 @@ def _extract_sku_variants(html: str) -> list:
     return variants
 
 
-def _extract_main_images(html: str) -> list:
-    """提取主图 CDN 链接
+def _reconstruct_cdn_url(local_path: str) -> str:
+    """将浏览器保存后的本地 _files/ 路径重构回 CDN URL。
 
-    1688 渲染后的 HTML 包含 cbu01.alicdn.com 直链。
-    排除 logo、图标等小图（<176px 宽的排除）。
+    浏览器保存 1688 详情页时，主图 src 被改写为本地路径：
+      _files/O1CN01XXX_!!seller-0-cib.jpg_.webp
+    原 CDN URL：
+      https://cbu01.alicdn.com/img/ibank/O1CN01XXX_!!seller-0-cib.jpg
     """
-    images = re.findall(
-        r'src="(https://cbu01\.alicdn\.com/img/ibank/[^"]+)"',
-        html
-    )
+    if not local_path:
+        return ""
 
-    # 排除小图标和缩略图
+    path = local_path.strip()
+
+    # 已经是完整 URL
+    if path.startswith('http://') or path.startswith('https://'):
+        return path
+
+    # 提取文件名（去掉 _files/ 前缀和目录结构）
+    filename = os.path.basename(path)
+
+    # 1688 ibank 图片命名：O1CN01XXX_!!sellerID-0-cib.jpg_.webp
+    # 去掉尾部的 _.webp / _.jpg / _.png → 恢复原始扩展名
+    for suffix in ['_.webp', '_.jpg', '_.jpeg', '_.png']:
+        if filename.endswith(suffix):
+            filename = filename[:-len(suffix)]
+            break
+
+    # 检查是否为 ibank 格式
+    if re.match(r'^[A-Za-z0-9_!-]+\.[a-z]+$', filename):
+        return f"https://cbu01.alicdn.com/img/ibank/{filename}"
+
+    return path
+
+
+def _extract_main_images(html: str) -> list:
+    """提取主图链接。
+
+    浏览器保存的 1688 详情页中，主图容器结构：
+      <div class="ant-image v-image-wrap v-image-cover">
+        <img class="ant-image-img preview-img" src="_files/xxx.jpg_.webp">
+      </div>
+
+    优先从 preview-img 容器精确提取，兼容本地 _files/ 路径→CDN 重构。
+    兜底：传统 CDN 正则（排除头像/缩略图）。
+    """
     result = []
-    for url in images:
-        # 排除 _88x88 缩略图
-        if '_88x88' in url:
-            continue
-        # 排除 svg logo
-        if url.endswith('.svg'):
-            continue
-        result.append(url)
+    seen = set()
+
+    # 策略1：从 preview-img 容器提取（精确定位主图）
+    preview_pattern = re.compile(
+        r'class="ant-image-img\s+preview-img"[^>]*src="([^"]+)"'
+    )
+    for m in preview_pattern.finditer(html):
+        src = m.group(1).strip()
+        if src and src not in seen:
+            url = _reconstruct_cdn_url(src)
+            if url and url not in seen:
+                seen.add(url)
+                result.append(url)
+
+    # 策略2：从旧版 tb-booth / spec-items 区域提取
+    if not result:
+        for area_marker in ['tb-booth', 'spec-items', 'jqzoom']:
+            idx = html.find(area_marker)
+            if idx > 0:
+                area = html[idx:idx+3000]
+                for m in re.finditer(r'src="([^"]+)"', area):
+                    src = m.group(1).strip()
+                    if src and 'icon' not in src.lower() and src not in seen:
+                        url = _reconstruct_cdn_url(src)
+                        if url and url not in seen and 'ibank' in url:
+                            seen.add(url)
+                            result.append(url)
+                if result:
+                    break
+
+    # 策略3：兜底 CDN 正则（仅当上述策略都无效时）
+    if not result:
+        images = re.findall(
+            r'src="(https://cbu01\.alicdn\.com/img/ibank/[^"]+)"',
+            html
+        )
+        for url in images:
+            if '_88x88' in url or url.endswith('.svg'):
+                continue
+            if url not in seen:
+                seen.add(url)
+                result.append(url)
+
+    return result
+
+
+def _extract_detail_images(html: str) -> list:
+    """从详情描述区提取图片（详情图/副图）。
+
+    1688 详情描述在 #offer-template-0 / html-description 区域，
+    通常包含 usemap 图片或纯 img 标签。
+    """
+    result = []
+    seen = set()
+
+    # 策略1：从 html-description 容器
+    desc_match = re.search(
+        r'<v-detail-c\s+class="html-description"[^>]*>(.*?)</v-detail-c>',
+        html, re.DOTALL
+    )
+    if desc_match:
+        desc_html = desc_match.group(1)
+        for m in re.finditer(r'src="(https?://[^"]+\.(?:jpg|jpeg|png|webp))"', desc_html):
+            url = m.group(1)
+            if url not in seen:
+                seen.add(url)
+                result.append(url)
+
+    # 策略2：从 #offer-template-0 下含 usemap 的图片
+    if not result:
+        template_match = re.search(
+            r'<div[^>]*id="offer-template-0"[^>]*>(.*?)(?:</div>\s*</div>|<v-detail-c)',
+            html, re.DOTALL
+        )
+        if template_match:
+            tmpl_html = template_match.group(1)
+            for m in re.finditer(r'src="(https?://[^"]+\.(?:jpg|jpeg|png|webp))"', tmpl_html):
+                url = m.group(1)
+                if url not in seen and 'ibank' in url:
+                    seen.add(url)
+                    result.append(url)
 
     return result
 
 
 def _extract_description(html: str) -> str:
     """提取商品描述区 HTML（简要提取）"""
-    # 查找 html-description 区域
     m = re.search(
         r'<v-detail-c\s+class="html-description"[^>]*>'
         r'(.*?)'
@@ -334,7 +443,6 @@ def _extract_description(html: str) -> str:
     )
     if m:
         desc = m.group(1)
-        # 截取前 1000 字符作为摘要
         return desc[:1000]
 
     return ""
@@ -378,6 +486,7 @@ def to_unified_detail(alibaba_detail: Optional[AlibabaDetail]) -> Optional[dict]
         "sku_count": len(sku_list),
         "sku_matrix": sku_list,
         "main_images": alibaba_detail.main_images,
+        "detail_images": alibaba_detail.detail_images,
         "raw_data": {
             "description": alibaba_detail.description[:500],
             "attributes_list": [

@@ -249,7 +249,7 @@ def parse_detail(html: str, product_id: str = "") -> JdDetail:
     _extract_shop(soup, result)
 
     # ── 6. 主图 ──
-    _extract_images(soup, result)
+    _extract_images(soup, html, result)
 
     # ── 7. 属性参数 ──
     _extract_attributes(soup, result)
@@ -401,43 +401,93 @@ def _extract_shop(soup, result: JdDetail):
         result.shop_type = "普通店铺"
 
 
-def _extract_images(soup, result: JdDetail):
-    """提取主图
+def _extract_images(soup, html: str, result: JdDetail):
+    """提取主图。
 
-    尝试多种选择器兼容新旧版 JD 页面。
-    新版页面保存后图片 src 可能变为本地化路径（_files/xxx.jpg），
-    此时保留路径名供后续解析用。
+    浏览器保存的 JD 详情页图片路径可能为：
+    - CDN 直链: https://img14.360buyimg.com/n1/xxx.jpg
+    - 本地 _files/ 路径: ./xxx_files/xxx.jpg
+    - 共享 UI 图标（跨商品一致）: d607de0c281b0358.png
+
+    策略：
+    1. 优先从 #spec-n1 容器提取（新旧版兼容）
+    2. 从已知的 360buyimg CDN 域名精确匹配
+    3. 从 _files/ 过滤共享 UI 图标
+    4. 排除跨商品一致的 UI 图标
     """
     seen = set()
+    result.main_images = []
 
-    # 旧版 JD 选择器
-    for sel in [".spec-items img", "#spec-list img", ".lh-wrap img",
-                ".preview-thumb img", ".preview-scroll img"]:
-        for img in soup.select(sel):
-            src = img.get("data-src") or img.get("src", "")
+    # 跨商品共享的 UI 图标哈希列表（应被过滤）
+    SHARED_UI_ICONS = {
+        'd607de0c281b0358.png',
+        '09c35cebfaf51498.png',
+        '00833203203a8',
+    }
+
+    def _is_shared_ui(path: str) -> bool:
+        """检查是否为跨商品共享的 UI 图标"""
+        base = os.path.basename(path).lower()
+        for icon in SHARED_UI_ICONS:
+            if icon in base:
+                return True
+        return False
+
+    def _reconstruct_jd_cdn(local_path: str) -> str:
+        """将本地 _files/ 路径转为 CDN URL（JD 的图片无法从文件名直接重构，
+        因为没有共用的 CDN 模式。保留本地路径原值。"""
+        path = local_path.strip()
+        if path.startswith('http://') or path.startswith('https://'):
+            return path
+        return path  # 本地路径，保留原值
+
+    # 策略1：优先从 #spec-n1 容器提取（主图容器）
+    spec = soup.select_one("#spec-n1")
+    if spec:
+        for img in spec.find_all("img"):
+            src = img.get("src", "") or img.get("data-src", "") or ""
+            src = src.strip()
+            if not src:
+                continue
             if src.startswith("//"):
                 src = "https:" + src
-            if src and src not in seen and "loading" not in src.lower():
+            if "loading" in src.lower():
+                continue
+            if _is_shared_ui(src):
+                continue
+            if src not in seen:
                 seen.add(src)
-                result.main_images.append(src)
+                url = _reconstruct_jd_cdn(src)
+                if url:
+                    result.main_images.append(url)
 
-    # 新版 JD：spec-n1 容器（browser 保存后 src 本地化）
+    # 策略2：从 spec-list / preview-thumb 提取（旧版）
     if not seen:
-        spec = soup.select_one("#spec-n1")
-        if spec:
-            for img in spec.find_all("img"):
-                src = img.get("src", "") or img.get("data-src", "")
-                if src and src not in seen and "loading" not in src.lower():
+        for sel in [".spec-items img", "#spec-list img", ".lh-wrap img",
+                    ".preview-thumb img", ".preview-scroll img"]:
+            for img in soup.select(sel):
+                src = img.get("data-src") or img.get("src", "")
+                src = src.strip()
+                if not src or "loading" in src.lower():
+                    continue
+                if src.startswith("//"):
+                    src = "https:" + src
+                if _is_shared_ui(src):
+                    continue
+                if src not in seen:
                     seen.add(src)
                     result.main_images.append(src)
-
-    # 兜底：从整个页面搜 360buyimg 图片链接
+    
+    # 策略3：从 HTML 的 <img> 标签中提取 360buyimg CDN 链接
     if not seen:
-        import re
-        for url in re.findall(r'https?://[^"\'\s>]+360buyimg[^"\'\s>]*\.(?:jpg|jpeg|png|webp)', str(soup)):
+        for m in re.finditer(r'<img[^>]*src="(https?://img\d+\.360buyimg\.com[^"]+\.(?:jpg|jpeg|png|webp))"', html):
+            url = m.group(1)
             if url not in seen and "loading" not in url.lower():
                 seen.add(url)
                 result.main_images.append(url)
+
+    # 去重
+    result.main_images = list(dict.fromkeys(result.main_images))
 
 
 def _extract_attributes(soup, result: JdDetail):
