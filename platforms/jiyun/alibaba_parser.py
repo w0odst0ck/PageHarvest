@@ -531,7 +531,7 @@ class AlibabaParser(BaseParser):
     
     def get_price(self) -> Optional[Dict]:
         """获取价格信息"""
-        from utils.price_extractor import PriceExtractor
+        from platforms.jiyun.price_extractor import PriceExtractor
         
         extractor = PriceExtractor(self.html_content)
         return extractor.extract_all_prices()
