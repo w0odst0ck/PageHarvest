@@ -49,7 +49,6 @@ def parse_jiyun(html: str) -> Optional[UnifiedDetail]:
 
     # 详情图展示仅限前 5 张
     detail_images = detail_images_all[:5]
-        detail_images = _extract_jd_detail_images_from_soup(html)
 
     # ── 属性 ──
     attrs = {}
@@ -62,7 +61,12 @@ def parse_jiyun(html: str) -> Optional[UnifiedDetail]:
     price_min = 0.0
     price_max = 0.0
     if isinstance(price_info, dict):
-        price_min = float(price_info.get("price", 0) or 0)
+        # 急云价格格式: {main_price: {price: 21.9, min_amount: 1}, ...}
+        main_price = price_info.get("main_price", {}) or {}
+        if isinstance(main_price, dict):
+            price_min = float(main_price.get("price", 0) or 0)
+        if not price_min:
+            price_min = float(price_info.get("price", 0) or 0)
         price_max = float(price_info.get("original_price", 0) or 0)
 
     # ── 标题/品牌 ──
