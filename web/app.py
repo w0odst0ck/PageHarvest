@@ -537,31 +537,52 @@ def download(job_id: str, fmt: str):
             headers={"Content-Disposition": f"attachment; filename=ph_{job_id[:8]}.json"},
         )
     elif fmt == "zip":
-        # 图包：包含所有主图和详情图的 URL 列表
+        # 图包：下载所有图片并打包为 ZIP
         import io as io_module
+        import requests as req_lib
         buf = io_module.BytesIO()
+        total_dl = 0
+        failed_dl = 0
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
             for item in result.get("_detail_raw", []):
                 parsed = item.get("_parsed", {}) or {}
                 title = (parsed.get("title", "") or "无标题")[:40]
                 safe_title = re.sub(r'[\\/:*?"<>|]', "_", title)
                 all_imgs = parsed.get("all_images", []) or parsed.get("main_images", []) or []
-                detail_imgs = parsed.get("detail_images", []) or []
-                if detail_imgs:
-                    for u in detail_imgs:
-                        if u not in all_imgs:
-                            all_imgs.append(u)
-                if all_imgs:
-                    content = "\n".join(all_imgs)
-                    zf.writestr(f"{safe_title}_images.txt", content)
-            # 添加汇总
-            all_urls_line = []
-            for item in result.get("_detail_raw", []):
-                parsed = item.get("_parsed", {}) or {}
-                all_imgs = parsed.get("all_images", []) or parsed.get("main_images", []) or []
-                all_urls_line.extend(all_imgs)
-            if all_urls_line:
-                zf.writestr("_all_images.txt", "\n".join(all_urls_line))
+                if not all_imgs:
+                    continue
+                # 下载每张图片
+                for idx, url in enumerate(all_imgs):
+                    if url.startswith("data:"):
+                        continue  # base64 无法直接保存
+                    try:
+                        ext = ".jpg"
+                        for e in (".png", ".webp", ".avif", ".gif"):
+                            if e in url.lower():
+                                ext = e
+                                break
+                        resp = req_lib.get(url, timeout=15, headers={
+                            "User-Agent": "Mozilla/5.0",
+                            "Referer": "https://detail.1688.com/",
+                        })
+                        if resp.status_code == 200:
+                            fname = f"{safe_title}/{idx+1:02d}{ext}"
+                            zf.writestr(fname, resp.content)
+                            total_dl += 1
+                        else:
+                            # URL 回退
+                            zf.writestr(f"{safe_title}/{idx+1:02d}.txt", url)
+                            failed_dl += 1
+                    except Exception:
+                        zf.writestr(f"{safe_title}/{idx+1:02d}.txt", url)
+                        failed_dl += 1
+            # 汇总信息
+            summary = f"""图片图包
+下载时间: {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+成功下载: {total_dl} 张
+失败(URL): {failed_dl} 张
+"""
+            zf.writestr("_summary.txt", summary)
         zip_bytes = buf.getvalue()
         return send_file(BytesIO(zip_bytes), mimetype="application/zip",
                          as_attachment=True, download_name=f"ph_{job_id[:8]}_images.zip")
