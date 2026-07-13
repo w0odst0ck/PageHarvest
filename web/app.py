@@ -242,31 +242,31 @@ def _run_detail(job_id: str, zip_bytes: bytes):
             # 仅当解析器本身未提取到主图时才启用，避免覆盖解析器的精确提取
             if detail:
                 # 浏览器保存页面的 _files/ 目录补充
-                # 解析器只从 HTML 提取，但浏览器保存后图片全在 _files/
-                # 策略：按大小排序取最大 20 张（跳过 UI 图标和极小图）
-                if not detail.main_images:
-                    files_dir = html_path.parent / (html_path.stem + "_files")
-                    if files_dir.is_dir():
-                        per_product_dir = ROOT / "web" / "static" / "detail-images" / job_id / str(i)
-                        per_product_dir.mkdir(parents=True, exist_ok=True)
-                        candidates = []
-                        for img_file in files_dir.iterdir():
-                            if img_file.suffix.lower() not in (".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"):
-                                continue
-                            if img_file.stat().st_size < 10240:  # < 10KB 跳过（UI 图标）
-                                continue
-                            candidates.append(img_file)
-                        candidates.sort(key=lambda f: f.stat().st_size, reverse=True)
-                        img_urls = []
-                        for img_file in candidates[:20]:  # 只取最大的 20 张
-                            try:
-                                dst = per_product_dir / img_file.name
-                                shutil.copy2(str(img_file), str(dst))
-                                img_urls.append(f"/static/detail-images/{job_id}/{i}/{img_file.name}")
-                            except Exception:
-                                pass
-                        if img_urls:
-                            detail.main_images = img_urls
+                # 浏览器保存后，动态加载的图全在 _files/ 目录（JD 页面尤其明显）
+                # 解析器只从静态 HTML 提取，通常只拿到 0~3 张
+                # 策略：当主图不足时，从 _files/ 按大小取最大 20 张补充
+                files_dir = html_path.parent / (html_path.stem + "_files")
+                if files_dir.is_dir() and len(detail.main_images) < 5:
+                    per_product_dir = ROOT / "web" / "static" / "detail-images" / job_id / str(i)
+                    per_product_dir.mkdir(parents=True, exist_ok=True)
+                    candidates = []
+                    for img_file in files_dir.iterdir():
+                        if img_file.suffix.lower() not in (".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"):
+                            continue
+                        if img_file.stat().st_size < 10240:  # < 10KB 跳过（UI 图标）
+                            continue
+                        candidates.append(img_file)
+                    candidates.sort(key=lambda f: f.stat().st_size, reverse=True)
+                    img_urls = []
+                    for img_file in candidates[:20]:
+                        try:
+                            dst = per_product_dir / img_file.name
+                            shutil.copy2(str(img_file), str(dst))
+                            img_urls.append(f"/static/detail-images/{job_id}/{i}/{img_file.name}")
+                        except Exception:
+                            pass
+                    if img_urls:
+                        detail.main_images = img_urls
 
                 # 解析器提取到了主图，但含相对路径 → 转绝对
                 if detail.main_images:
