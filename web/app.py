@@ -238,29 +238,31 @@ def _run_detail(job_id: str, zip_bytes: bytes):
             platform = detect_platform(html)
             detail = parse_detail(html)
 
-            # 补充：从 _files/ 目录提取本地化图片（JD 浏览器保存的页面）
+            # 补充：从 _files/ 目录提取本地化图片
+            # 仅当解析器本身未提取到主图时才启用，避免覆盖解析器的精确提取
             if detail:
-                files_dir = html_path.parent / (html_path.stem + "_files")
-                img_urls = []
-                if files_dir.is_dir():
-                    img_dir = ROOT / "web" / "static" / "detail-images" / job_id
-                    img_dir.mkdir(parents=True, exist_ok=True)
-                    for img_file in sorted(files_dir.iterdir()):
-                        if img_file.suffix.lower() not in (".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"):
-                            continue
-                        if img_file.stat().st_size < 5120:
-                            continue
-                        try:
-                            import shutil
-                            shutil.copy2(str(img_file), str(img_dir / img_file.name))
-                            img_urls.append(f"/static/detail-images/{job_id}/{img_file.name}")
-                        except Exception:
-                            pass
-                    if len(img_urls) > 50:
-                        img_urls = img_urls[:50]
-                if img_urls:
-                    detail.main_images = img_urls
-                elif detail.main_images:
+                if not detail.main_images:
+                    files_dir = html_path.parent / (html_path.stem + "_files")
+                    img_urls = []
+                    if files_dir.is_dir():
+                        img_dir = ROOT / "web" / "static" / "detail-images" / job_id
+                        img_dir.mkdir(parents=True, exist_ok=True)
+                        for img_file in sorted(files_dir.iterdir()):
+                            if img_file.suffix.lower() not in (".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"):
+                                continue
+                            if img_file.stat().st_size < 5120:
+                                continue
+                            try:
+                                import shutil
+                                shutil.copy2(str(img_file), str(img_dir / img_file.name))
+                                img_urls.append(f"/static/detail-images/{job_id}/{img_file.name}")
+                            except Exception:
+                                pass
+                        if img_urls:
+                            detail.main_images = img_urls[:50]
+
+                # 解析器提取到了主图，但含相对路径 → 转绝对
+                if detail.main_images:
                     resolved = []
                     for img_path in detail.main_images:
                         if img_path.startswith("./"):
@@ -391,13 +393,20 @@ def _run_detail(job_id: str, zip_bytes: bytes):
 
         # 构建图片预览数据
         detail_images_preview = []
+        detail_desc_images_preview = []
         for r in ok:
             raw = r.get("_raw")
-            if raw and raw.main_images:
-                detail_images_preview.append({
-                    "title": f"{raw.brand or '?'} - {raw.title[:40]}",
-                    "images": raw.main_images[:10],
-                })
+            if raw:
+                if raw.main_images:
+                    detail_images_preview.append({
+                        "title": f"{raw.brand or '?'} - {raw.title[:40]}",
+                        "images": raw.main_images[:10],
+                    })
+                if raw.detail_images:
+                    detail_desc_images_preview.append({
+                        "title": f"{raw.brand or '?'} - {raw.title[:40]}",
+                        "images": raw.detail_images[:10],
+                    })
 
         # 构建完整解析 JSON
         raw_json = []
@@ -422,6 +431,7 @@ def _run_detail(job_id: str, zip_bytes: bytes):
                         "最低价", "最高价", "属性数", "SKU数", "主图数", "状态"],
             "_detail_raw": raw_json,
             "_detail_images": detail_images_preview,
+            "_detail_desc_images": detail_desc_images_preview,
         }
         if xlsx_bytes:
             display["has_xlsx"] = True

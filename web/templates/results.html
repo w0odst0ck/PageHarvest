@@ -59,10 +59,13 @@
 {% endif %}
 
 <!-- 图片预览（仅详情页有图片时） -->
-{% if r.mode == 'detail' and result._detail_images %}
+{% if r.mode == 'detail' %}
+
+<!-- 主图预览 -->
+{% if result._detail_images %}
 <div class="card">
   <div class="card-header">
-    <h2>🖼️ 商品图片</h2>
+    <h2>🖼️ 主图</h2>
     <span class="count-badge">{{ result._detail_images|length }} 个商品</span>
   </div>
   <div class="card-body">
@@ -80,6 +83,32 @@
     {% endfor %}
   </div>
 </div>
+{% endif %}
+
+<!-- 详情图预览（detail_images） -->
+{% if result._detail_desc_images %}
+<div class="card">
+  <div class="card-header">
+    <h2>📋 详情描述图</h2>
+    <span class="count-badge">{{ result._detail_desc_images|length }} 个商品</span>
+  </div>
+  <div class="card-body">
+    {% for item in result._detail_desc_images %}
+    <div class="product-images">
+      <p class="product-images-title">{{ item.title }}</p>
+      <div class="image-grid">
+        {% for url in item.images[:5] %}
+        <a href="{{ url }}" target="_blank" class="image-thumb">
+          <img src="{{ url }}" loading="lazy" onerror="this.parentNode.style.display='none'">
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 {% endif %}
 
 <!-- 数据表格（仅搜索页） -->
