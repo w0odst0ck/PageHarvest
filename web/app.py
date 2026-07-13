@@ -536,6 +536,35 @@ def download(job_id: str, fmt: str):
             mimetype="application/json; charset=utf-8",
             headers={"Content-Disposition": f"attachment; filename=ph_{job_id[:8]}.json"},
         )
+    elif fmt == "zip":
+        # 图包：包含所有主图和详情图的 URL 列表
+        import io as io_module
+        buf = io_module.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for item in result.get("_detail_raw", []):
+                parsed = item.get("_parsed", {}) or {}
+                title = (parsed.get("title", "") or "无标题")[:40]
+                safe_title = re.sub(r'[\\/:*?"<>|]', "_", title)
+                all_imgs = parsed.get("all_images", []) or parsed.get("main_images", []) or []
+                detail_imgs = parsed.get("detail_images", []) or []
+                if detail_imgs:
+                    for u in detail_imgs:
+                        if u not in all_imgs:
+                            all_imgs.append(u)
+                if all_imgs:
+                    content = "\n".join(all_imgs)
+                    zf.writestr(f"{safe_title}_images.txt", content)
+            # 添加汇总
+            all_urls_line = []
+            for item in result.get("_detail_raw", []):
+                parsed = item.get("_parsed", {}) or {}
+                all_imgs = parsed.get("all_images", []) or parsed.get("main_images", []) or []
+                all_urls_line.extend(all_imgs)
+            if all_urls_line:
+                zf.writestr("_all_images.txt", "\n".join(all_urls_line))
+        zip_bytes = buf.getvalue()
+        return send_file(BytesIO(zip_bytes), mimetype="application/zip",
+                         as_attachment=True, download_name=f"ph_{job_id[:8]}_images.zip")
     return "不支持", 400
 
 

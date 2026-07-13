@@ -37,14 +37,18 @@ def parse_jiyun(html: str) -> Optional[UnifiedDetail]:
     if not main_images and platform == "jd":
         main_images = _extract_jd_main_images_from_soup(html)
 
-    # ── 详情图 ──
-    detail_images = []
+    # ── 详情图（仅展示前 5 张，完整列表用于图包下载） ──
+    detail_images_all = []
     for url in info.get("detail_images", []):
         cleaned = _clean_jd_url(url) if platform == "jd" else url
         if cleaned:
-            detail_images.append(cleaned)
+            detail_images_all.append(cleaned)
 
-    if not detail_images and platform == "jd":
+    if not detail_images_all and platform == "jd":
+        detail_images_all = _extract_jd_detail_images_from_soup(html)
+
+    # 详情图展示仅限前 5 张
+    detail_images = detail_images_all[:5]
         detail_images = _extract_jd_detail_images_from_soup(html)
 
     # ── 属性 ──
@@ -69,6 +73,8 @@ def parse_jiyun(html: str) -> Optional[UnifiedDetail]:
             brand = val
             break
 
+    # 构建 UnifiedDetail
+    all_images_combined = list(dict.fromkeys(main_images + detail_images_all))
     return UnifiedDetail(
         platform=unified_platform,
         product_id=info.get("product_code", "") or "",
@@ -84,6 +90,7 @@ def parse_jiyun(html: str) -> Optional[UnifiedDetail]:
         sales_count=info.get("sales_count", 0) or 0,
         main_images=main_images,
         detail_images=detail_images,
+        all_images=all_images_combined,
         videos=info.get("videos", []),
         sku_count=len(info.get("color_options", [])),
         attributes=attrs,

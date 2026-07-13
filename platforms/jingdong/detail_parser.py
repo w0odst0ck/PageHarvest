@@ -657,6 +657,7 @@ def to_unified_detail(jd: JdDetail) -> dict:
         "detail_images": jd.description_images,
         "attributes": jd.attributes,
         "sku_count": 0,
+        "all_images": list(dict.fromkeys(jd.main_images + jd.description_images)),
         "raw_data": jd.raw_data,
     }
 
