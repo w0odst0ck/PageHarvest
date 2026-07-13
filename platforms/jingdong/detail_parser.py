@@ -418,20 +418,17 @@ def _extract_images(soup, html: str, result: JdDetail):
     seen = set()
     result.main_images = []
 
-    # 跨商品共享的 UI 图标哈希列表（应被过滤）
-    SHARED_UI_ICONS = {
+    # 跨商品共享的 UI 图标精确文件名列表（应被过滤）
+    # 注意：只做精确匹配，不要用子串，避免误杀真实商品图
+    SHARED_UI_FILES = {
         'd607de0c281b0358.png',
         '09c35cebfaf51498.png',
-        '00833203203a8',
     }
 
     def _is_shared_ui(path: str) -> bool:
         """检查是否为跨商品共享的 UI 图标"""
         base = os.path.basename(path).lower()
-        for icon in SHARED_UI_ICONS:
-            if icon in base:
-                return True
-        return False
+        return base in SHARED_UI_FILES
 
     def _reconstruct_jd_cdn(local_path: str) -> str:
         """将本地 _files/ 路径转为 CDN URL（JD 的图片无法从文件名直接重构，
