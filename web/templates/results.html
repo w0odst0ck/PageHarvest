@@ -74,14 +74,25 @@
     <div class="product-images">
       <p class="product-images-title">{{ item.title }}</p>
       <div class="image-grid">
-        {% for url in item.images[:5] %}
-        <a href="{{ url }}" target="_blank" class="image-thumb">
-          <img src="{{ url }}" loading="lazy" onerror="this.parentNode.style.display='none'">
+        {% for url in item.images[:10] %}
+        <a href="{{ url }}" target="_blank" class="image-thumb" data-url="{{ url }}">
+          <img src="{{ url }}" loading="lazy" onerror="this.onerror=null;this.style.display='none';this.parentNode.classList.add('img-unavailable')">
+          <span class="img-fallback"> 外部图片<br><small>需平台登录</small></span>
         </a>
         {% endfor %}
       </div>
     </div>
     {% endfor %}
+    <div class="card-note mt-12">
+      <p>⚠️ 部分平台（震坤行、1688 等）的图片需登录其网站才能访问。<br>
+         如需提取图片，请：</p>
+      <ol class="ml-20 mt-8">
+        <li>下载 <strong>CSV</strong> 或 <strong>JSON</strong> 查看完整图片 CDN 地址</li>
+        <li>复制 URL 到浏览器直接访问（可能需要平台登录态）</li>
+        <li>批量下载：<code>curl -O https://.../BIG_xxx.jpg</code></li>
+        <li>或重新用浏览器保存页面（SingleFile）上传 ZIP，图片会内嵌在 HTML 中</li>
+      </ol>
+    </div>
   </div>
 </div>
 {% endif %}
@@ -98,9 +109,10 @@
     <div class="product-images">
       <p class="product-images-title">{{ item.title }}</p>
       <div class="image-grid">
-        {% for url in item.images[:5] %}
-        <a href="{{ url }}" target="_blank" class="image-thumb">
-          <img src="{{ url }}" loading="lazy" onerror="this.parentNode.style.display='none'">
+        {% for url in item.images[:10] %}
+        <a href="{{ url }}" target="_blank" class="image-thumb" data-url="{{ url }}">
+          <img src="{{ url }}" loading="lazy" onerror="this.onerror=null;this.style.display='none';this.parentNode.classList.add('img-unavailable')">
+          <span class="img-fallback"> 外部图片<br><small>需平台登录</small></span>
         </a>
         {% endfor %}
       </div>

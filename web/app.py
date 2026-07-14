@@ -407,7 +407,7 @@ def _run_detail(job_id: str, zip_bytes: bytes):
                 if raw.main_images:
                     detail_images_preview.append({
                         "title": f"{raw.brand or '?'} - {raw.title[:40]}",
-                        "images": raw.main_images[:10],
+                        "images": raw.main_images[:20],
                     })
                 if raw.detail_images:
                     detail_desc_images_preview.append({
@@ -540,6 +540,7 @@ def download(job_id: str, fmt: str):
         # 图包：下载所有图片并打包为 ZIP
         import io as io_module
         import requests as req_lib
+        import base64
         buf = io_module.BytesIO()
         total_dl = 0
         failed_dl = 0
@@ -552,9 +553,26 @@ def download(job_id: str, fmt: str):
                 if not all_imgs:
                     continue
                 # 下载每张图片
+                MIN_IMAGE_BYTES = 5120  # < 5KB 跳过（UI 图标）
                 for idx, url in enumerate(all_imgs):
-                    if url.startswith("data:"):
-                        continue  # base64 无法直接保存
+                    # 处理 base64 内嵌图片（SingleFile 保存）
+                    if url.startswith("data:image/"):
+                        try:
+                            m = re.match(r'data:image/(\w+);base64,(.+)', url)
+                            if m:
+                                ext_map = {"png": ".png", "jpeg": ".jpg", "jpg": ".jpg",
+                                           "gif": ".gif", "webp": ".webp", "avif": ".avif"}
+                                ext = ext_map.get(m.group(1), ".png")
+                                img_data = base64.b64decode(m.group(2))
+                                if len(img_data) < MIN_IMAGE_BYTES:
+                                    continue  # 太小的不是商品图
+                                fname = f"{safe_title}/{idx+1:02d}{ext}"
+                                zf.writestr(fname, img_data)
+                                total_dl += 1
+                        except Exception:
+                            pass  # 解码失败直接跳过
+                        continue
+                    # 非 base64：尝试从 CDN 下载
                     try:
                         ext = ".jpg"
                         for e in (".png", ".webp", ".avif", ".gif"):

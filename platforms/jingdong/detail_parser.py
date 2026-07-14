@@ -67,14 +67,14 @@ _JD_SEARCH_SIGNATURES = [
 
 # 京东详情页 item.jd.com 独有的特征（搜索页不含）
 _JD_DETAIL_SIGNATURES = [
-    # 新版 React 架构（2025+）
-    'class="attrs"',                                   # 新版属性表
-    'class="highlight-attrs"',                        # 新版高亮属性
-    'class="top-name"',                               # 新版店铺名
+    # 新版 React 架构（2025+）— 兼容有引号/无引号属性
+    r'class="?attrs[\s>]',                            # 新版属性表
+    r'class="?highlight-attrs[\s>]',                 # 新版高亮属性
+    r'class="?top-name[\s>]',                        # 新版店铺名
     'waist-shop-title',                                # 新版进店逛逛
-    'class="expert-selection-root"',                  # 新版达人选购
-    'class="left-tabs-item"',                         # 新版左侧Tab
-    'class="SPXQ-title"',                             # 新版商品详情
+    r'class="?expert-selection-root[\s>]',           # 新版达人选购
+    r'class="?left-tabs-item[\s>]',                  # 新版左侧Tab
+    r'class="?SPXQ-title[\s>]',                      # 新版商品详情
     # 旧版页面的特征
     r'window\.pageConfig\s*=\s*{\s*["product]',      # 商品级 pageConfig
     'itemInfo-wrap',                                  # 详情页信息区
@@ -146,7 +146,7 @@ def validate_detail_html(html: str) -> tuple[bool, str]:
     has_sku_name = '.sku-name' in html
 
     # 新版页面特征：只要有属性表或店铺名就认为通过
-    has_new_attrs = bool(re.search(r'class="attrs"', html)) and bool(re.search(r'class="top-name"', html))
+    has_new_attrs = bool(re.search(r'class="?attrs[\s>]', html)) and bool(re.search(r'class="?top-name[\s>]', html))
     if has_new_attrs:
         return True, "ok"
 
@@ -232,6 +232,7 @@ def parse_detail(html: str, product_id: str = "") -> JdDetail:
     soup = BeautifulSoup(html, "html.parser")
     result = JdDetail(product_id=product_id)
     result.raw_data["html_size"] = len(html)
+    result.raw_data["__html"] = html  # 保存原文供后续提取
 
     # ── 1. 从 pageConfig JSON 提取核心信息 ──
     _extract_page_config(html, result)
@@ -418,73 +419,65 @@ def _extract_images(soup, html: str, result: JdDetail):
     seen = set()
     result.main_images = []
 
-    # 跨商品共享的 UI 图标精确文件名列表（应被过滤）
-    # 注意：只做精确匹配，不要用子串，避免误杀真实商品图
-    SHARED_UI_FILES = {
-        'd607de0c281b0358.png',
-        '09c35cebfaf51498.png',
-    }
+    def _is_product_cdn_url(url: str) -> bool:
+        """判断是否为京东商品图 CDN 路径（排除 UI 图标、用户头像、CMS 内容等）"""
+        if not re.match(r'https?://img\d+\.360buyimg\.com/', url):
+            return False
+        path = url.split('.com', 1)[1] if '.com' in url else ''
+        # 仅保留主商品图路径
+        for prefix in ['/n1/', '/n0/', '/n5/', '/s1/', '/s0/', '/pcpubliccms/s1440x1440']:
+            if path.startswith(prefix):
+                # 排除过小的缩略图（< 10KB 通过文件名校验）
+                fn = url.split('/')[-1]
+                if 'icon' in fn.lower():
+                    return False
+                return True
+        return False
 
-    def _is_shared_ui(path: str) -> bool:
-        """检查是否为跨商品共享的 UI 图标"""
-        base = os.path.basename(path).lower()
-        return base in SHARED_UI_FILES
-
-    def _reconstruct_jd_cdn(local_path: str) -> str:
-        """将本地 _files/ 路径转为 CDN URL（JD 的图片无法从文件名直接重构，
-        因为没有共用的 CDN 模式。保留本地路径原值。"""
-        path = local_path.strip()
-        if path.startswith('http://') or path.startswith('https://'):
-            return path
-        return path  # 本地路径，保留原值
-
-    # 策略1：优先从 #spec-n1 容器提取（主图容器）
+    # 策略1：从 #spec-n1 容器提取内嵌 base64 主图
+    import base64 as _b64
     spec = soup.select_one("#spec-n1")
     if spec:
         for img in spec.find_all("img"):
-            src = img.get("src", "") or img.get("data-src", "") or ""
-            src = src.strip()
-            if not src:
-                continue
-            if src.startswith("//"):
-                src = "https:" + src
-            if "loading" in src.lower():
-                continue
-            if _is_shared_ui(src):
-                continue
-            if src not in seen:
-                seen.add(src)
-                url = _reconstruct_jd_cdn(src)
-                if url:
-                    result.main_images.append(url)
-
-    # 策略2：从 spec-list / preview-thumb 提取（旧版）
-    if not seen:
-        for sel in [".spec-items img", "#spec-list img", ".lh-wrap img",
-                    ".preview-thumb img", ".preview-scroll img"]:
-            for img in soup.select(sel):
-                src = img.get("data-src") or img.get("src", "")
-                src = src.strip()
-                if not src or "loading" in src.lower():
-                    continue
-                if src.startswith("//"):
-                    src = "https:" + src
-                if _is_shared_ui(src):
-                    continue
+            src = img.get("src", "") or ""
+            if src.startswith("data:image/") and not src.startswith("data:image/svg"):
+                # 跳过小于 5KB 的 base64 图片（loading 占位图）
+                m = re.match(r'data:image/\w+;base64,(.+)', src)
+                if m:
+                    try:
+                        raw = _b64.b64decode(m.group(1))
+                        if len(raw) < 5120:
+                            continue
+                    except Exception:
+                        pass
                 if src not in seen:
                     seen.add(src)
                     result.main_images.append(src)
-    
-    # 策略3：从 HTML 的 <img> 标签中提取 360buyimg CDN 链接
+            # 同时提取 data-sf-original-src CDN 地址
+            sf_src = img.get("data-sf-original-src", "") or ""
+            if sf_src and _is_product_cdn_url(sf_src) and sf_src not in seen:
+                seen.add(sf_src)
+                result.main_images.append(sf_src)
+
+    # 策略2：从 HTML 各 img 标签提取 data-sf-original-src（SingleFile 保留的原始 URL）
+    if not result.main_images:
+        for img in soup.find_all("img"):
+            for attr in ["data-sf-original-src", "data-sf-original-url"]:
+                src = img.get(attr, "")
+                if src and _is_product_cdn_url(src) and src not in seen:
+                    seen.add(src)
+                    result.main_images.append(src)
+
+    # 策略3：精确匹配 product page 区域的 CDN URL（仅 /n1/、/pcpubliccms/s1440x1440）
     if not seen:
-        for m in re.finditer(r'<img[^>]*src="(https?://img\d+\.360buyimg\.com[^"]+\.(?:jpg|jpeg|png|webp))"', html):
-            url = m.group(1)
-            if url not in seen and "loading" not in url.lower():
+        for m in re.finditer(r"https?://img\d+\.360buyimg\.com[^\"'\s<>]+", html):
+            url = m.group(0)
+            if _is_product_cdn_url(url) and url not in seen:
                 seen.add(url)
                 result.main_images.append(url)
 
-    # 去重
-    result.main_images = list(dict.fromkeys(result.main_images))
+    # 去重，只保留前 10 张
+    result.main_images = list(dict.fromkeys(result.main_images))[:10]
 
 
 def _extract_attributes(soup, result: JdDetail):
@@ -509,25 +502,41 @@ def _extract_attributes(soup, result: JdDetail):
 
 
 def _extract_sales(soup, result: JdDetail):
-    """提取销售数据"""
-    for sel in [".J-sale-data", ".sale-data", ".comment-count .count",
-                "#comment-count .count", ".sales-volume"]:
-        el = soup.select_one(sel)
-        if el:
-            text = el.get_text(strip=True)
-            if re.search(r'[\d.万+]+', text):
-                result.sales_count = text
-                break
+    """提取销售数据（兼容新旧版）"""
+    # 新版：买家评价(50万+)  <!-- 或 累计评价 -->
+    if not result.sales_count:
+        m = re.search(r'累计评价[^\d]*([\d.万+]+)', result.raw_data.get("__html", ""))
+        if not m:
+            m = re.search(r'买家评价\((\d+万?\+?)\)', result.raw_data.get("__html", ""))
+        if m:
+            result.sales_count = m.group(1)
 
-    for sel in [".good-rate", ".good-comment-percent", ".percent-con",
-                ".comment-percent", ".J-comment-percent"]:
-        el = soup.select_one(sel)
-        if el:
-            text = el.get_text(strip=True)
-            m = re.search(r'(\d+%)', text)
-            if m:
-                result.rating = m.group(1)
-                break
+    if not result.sales_count:
+        for sel in [".J-sale-data", ".sale-data", ".comment-count .count",
+                    "#comment-count .count", ".sales-volume"]:
+            el = soup.select_one(sel)
+            if el:
+                text = el.get_text(strip=True)
+                if re.search(r'[\d.万+]+', text):
+                    result.sales_count = text
+                    break
+
+    # 新版：超99%买家赞不绝口
+    if not result.rating:
+        m = re.search(r'超(\d+%)买家赞不绝口', result.raw_data.get("__html", ""))
+        if m:
+            result.rating = m.group(1)
+
+    if not result.rating:
+        for sel in [".good-rate", ".good-comment-percent", ".percent-con",
+                    ".comment-percent", ".J-comment-percent"]:
+            el = soup.select_one(sel)
+            if el:
+                text = el.get_text(strip=True)
+                m = re.search(r'(\d+%)', text)
+                if m:
+                    result.rating = m.group(1)
+                    break
 
 
 def _extract_tags(soup, result: JdDetail):
@@ -555,13 +564,15 @@ def _extract_new_attributes(html: str, result: JdDetail):
         </div>
       </div>
     """
-    if 'class="attrs"' not in html:
+    if not re.search(r'class="?attrs[\s>]', html):
         return
 
     attr_pattern = re.compile(
-        r'<div\s+class="item[^"]*">\s*'
-        r'<div\s+class="label">\s*<span\s+class="text">\s*([^<]+)\s*</span>\s*</div>\s*'
-        r'<div\s+class="value">\s*<div\s+class="text"\s+title="([^"]*)"',
+        r'<div\s+class="?item[^>"]*[\s>].*?'
+        r'<div\s+class="?label[^>"]*[\s>].*?<span\s+class="?text[^>"]*[\s>]\s*([^<]+)\s*</span>'
+        r'.*?<div\s+class="?value[^>"]*[\s>].*?'
+        r'<div\s+class="?text[^>"]*[\s>]\s*title="?([^">]*)"?'
+        r'[^>]*>',
         re.DOTALL
     )
     for m in attr_pattern.finditer(html):
@@ -579,7 +590,7 @@ def _extract_new_attributes(html: str, result: JdDetail):
 
 
 def _extract_new_shop_info(html: str, result: JdDetail):
-    m = re.search(r'class="top-name"[^>]*title="([^"]*)"', html)
+    m = re.search(r'class="?top-name[^>"]*[\s>].*?title="?([^">]*)"?', html, re.DOTALL)
     if m:
         result.shop_name = m.group(1).strip()
         if "京东自营" in result.shop_name or "自营" in result.shop_name:
@@ -588,15 +599,41 @@ def _extract_new_shop_info(html: str, result: JdDetail):
             result.shop_type = "旗舰店"
         else:
             result.shop_type = "第三方"
+    # 兜底：waist-shop-title 区域提取店铺名
+    if not result.shop_name:
+        m = re.search(r'waist-shop-title.*?class="?shop-name[^">]*"?[^>]*>([^<]+)', html, re.DOTALL)
+        if m:
+            result.shop_name = m.group(1).strip()
 
 
 def _extract_new_price(html: str, result: JdDetail):
-    prices = re.findall(r'<div\s+class="value">([\d.]+)</div>', html)
+    """从新版 JD 价格区域提取。
+    新格式: <div class=price><div class=unit>￥</div><div class=value>79</div></div>
+    """
+    # 优先提取 price 容器内的 value
+    price_area = re.search(
+        r'class="?price[^>"]*[\s>].*?'
+        r'class="?value[^>"]*[\s>]([\d.]+)</div>',
+        html, re.DOTALL
+    )
+    if price_area:
+        try:
+            val = float(price_area.group(1))
+            if 0.01 < val < 100000:
+                result.price_min = val
+                return
+        except ValueError:
+            pass
+
+    # 兜底：任意 class=value 中的数字
+    prices = re.findall(r'class="?value[^>"]*[\s>]([\d.]+)</div>', html)
     if prices:
         vals = []
         for p in prices:
             try:
-                vals.append(float(p))
+                v = float(p)
+                if 0.01 < v < 100000:
+                    vals.append(v)
             except ValueError:
                 pass
         if vals:
@@ -605,16 +642,32 @@ def _extract_new_price(html: str, result: JdDetail):
 
 
 def _extract_new_highlight_attrs(html: str, result: JdDetail):
-    """提取新版高亮属性（显色指数、最大瓦数、供电方式等）"""
+    """提取新版高亮属性（显色指数、最大瓦数、供电方式等）
+    结构（新版无引号）:
+      <div class=highlight-attrs>
+        <div class=item>
+          <div class="title text-ellipsis" title=VALUE>VALUE_TEXT</div>
+          <div class=desc><div class="text text-ellipsis" title=NAME>NAME_TEXT</div></div>
+        </div>
+      </div>
+    然后紧接 <div class=attrs>...
+    """
+    # 定位 highlight-attrs 区域（到下一个 class=attrs 为止）
+    m_cont = re.search(r'class="?highlight-attrs[^>"]*[\s>](.*?)(?:class="?attrs[\s>]|$)',
+                       html, re.DOTALL)
+    if not m_cont:
+        return
+    hl_html = m_cont.group(1)
+    
     highlight = re.compile(
-        r'<div\s+class="item">\s*'
-        r'<div\s+class="title[^"]*">([^<]+)</div>\s*'
-        r'<div\s+class="desc">\s*<div\s+class="text[^"]*">([^<]+)</div>',
+        r'<div\s+class="?item[^>"]*[\s>].*?'
+        r'<div\s+class="?title[^>"]*[\s>][^>]*title="?([^">]*)"?[^>]*>.*?'
+        r'<div\s+class="?desc[^>"]*[\s>].*?<div\s+class="?text[^>"]*[\s>][^>]*title="?([^">]*)"?[^>]*>',
         re.DOTALL
     )
-    for m in highlight.finditer(html):
-        name = m.group(2).strip()
-        value = m.group(1).strip()
+    for m in highlight.finditer(hl_html):
+        value = m.group(1).strip()  # title div → 值
+        name = m.group(2).strip()   # desc > text div → 属性名
         if name and value:
             result.attributes[name] = value
 
@@ -643,22 +696,45 @@ def _param_value(el) -> str:
 
 def to_unified_detail(jd: JdDetail) -> dict:
     """转换为 core.schema.UnifiedDetail 兼容的字典"""
+    # spec 优先级: 国补备案型号 > model > 商品编号
+    spec = jd.attributes.get("国补备案型号", "") or jd.model or jd.attributes.get("商品编号", "")
+    all_imgs = list(dict.fromkeys(jd.main_images + jd.description_images))
+    # 清理 raw_data 中的大字段
+    clean_raw = {k: v for k, v in jd.raw_data.items() if k != "__html"}
+    try:
+        raw_sales = jd.sales_count
+        # 100万+ → 1000000
+        if '万' in raw_sales:
+            sales_num = int(float(re.sub(r'[^\d.]', '', raw_sales)) * 10000)
+        else:
+            sales_num = int(re.sub(r'[^\d]', '', raw_sales))
+    except (ValueError, TypeError):
+        sales_num = 0
     return {
         "platform": "京东",
         "product_id": jd.product_id,
         "product_url": f"https://item.jd.com/{jd.product_id}.html" if jd.product_id else "",
         "title": jd.title,
         "brand": jd.brand,
-        "spec": jd.model or "",
+        "spec": spec,
         "product_code": jd.product_id,
         "price_min": jd.price_min,
         "price_max": jd.price_max,
+        "min_order": 1,
+        "ship_from": "",
+        "sales_count": sales_num,
+        "yearly_sales": "",
+        "repurchase_rate": "",
+        "listing_date": "",
         "main_images": jd.main_images,
         "detail_images": jd.description_images,
-        "attributes": jd.attributes,
+        "all_images": all_imgs,
+        "videos": [],
         "sku_count": 0,
-        "all_images": list(dict.fromkeys(jd.main_images + jd.description_images)),
-        "raw_data": jd.raw_data,
+        "attributes": jd.attributes,
+        "sku_matrix": [],
+        "color_options": [],
+        "raw_data": clean_raw,
     }
 
 

@@ -168,16 +168,20 @@ def parse_detail(html: str, product_id: str = "") -> ZkhDetail:
 
     # ── 2. 产品 ID ──
     if not result.product_id:
-        # 从订货编码推断？不行，product_id 是 URL 中的
         # 尝试从 HTML 中的隐藏字段获取
         for pat in [
-            r'\"productId\":\s*\"([A-Z0-9]+)\"',
-            r'\"proGroupNo\":\s*\"([A-Z0-9]+)\"',
+            r'"productId":\s*"([A-Z0-9]+)"',
+            r'"proGroupNo":\s*"([A-Z0-9]+)"',
         ]:
             m = re.search(pat, html)
             if m:
                 result.product_id = m.group(1)
                 break
+    if not result.product_id:
+        # 兜底：从 data-sf-original-src 中的 BIG_ 文件名提取
+        m = re.search(r'data-sf-original-src="[^"]*BIG_([A-Z0-9]+)_\d+', html)
+        if m:
+            result.product_id = m.group(1)
 
     # ── 3. SKU 编码（订货编码） ──
     first_sku = soup.select_one(".clearfix.sku-number")
@@ -234,27 +238,60 @@ def parse_detail(html: str, product_id: str = "") -> ZkhDetail:
 
     # ── 8. 主图 ──
     seen_images = set()
-    # 优先从 gallery 取
+    pid_filter = result.product_id or ""
+
+    def _is_product_big(url: str) -> bool:
+        """判断 URL 是否为当前商品的主图 BIG_ 图片"""
+        if "private.zkh.com/PRODUCT/BIG/" not in url:
+            return False
+        filename = os.path.basename(url.split("?")[0])
+        if pid_filter and f"BIG_{pid_filter}_" in filename:
+            return True
+        return filename.startswith("BIG_")
+
+    # 策略0-1：从 img 标签提取内嵌 base64 图片（SingleFile 嵌入，可浏览器内显示）
+    # 优先从 gallery 区提取
     for sel in [".gallery-wrap img", ".img-wrap img", ".gallery-slick-box img", ".img-zoom-base-wrap img"]:
         for img in soup.select(sel):
-            src = img.get("src", img.get("data-src", ""))
-            cdn_url = reconstruct_image_url(src)
-            if cdn_url and cdn_url not in seen_images:
-                # 过滤非商品图
-                base = os.path.basename(cdn_url)
-                if base.startswith("BIG_") or base.startswith("default"):
-                    if "default-img" not in cdn_url:
-                        seen_images.add(cdn_url)
-                        result.main_images.append(cdn_url)
+            src = img.get("src", "") or ""
+            if src.startswith("data:image/") and not src.startswith("data:image/svg"):
+                if src not in seen_images:
+                    seen_images.add(src)
+                    result.main_images.append(src)
+    # 兜底：从全 HTML 提取所有非 SVG 大图 base64（> 20KB = 实际商品图）
+    if len(seen_images) < 4:
+        for m in re.finditer(r"src=\"(data:image/(?!svg)[^;]+;base64,[^\"]+)\"", html):
+            src = m.group(1)
+            if src not in seen_images and len(src) > 30000:  # > ~22KB
+                seen_images.add(src)
+                result.main_images.append(src)
 
-    # 如果 gallery 没找到，从本地 files 目录推断
-    if not result.main_images:
-        # 从 HTML 中找所有图片文件名
-        for m in re.finditer(r'src="([^"]*BIG_[^"]+\.(?:jpg|jpeg|png))"', html):
-            cdn_url = reconstruct_image_url(m.group(1))
-            if cdn_url and cdn_url not in seen_images:
-                seen_images.add(cdn_url)
-                result.main_images.append(cdn_url)
+    # 策略1：从 data-sf-original-src 提取 CDN URL（供 CSV/JSON 下载使用）
+    for m in re.finditer(r"data-sf-original-src=\"(https?:[^\"'\s]+)\"", html):
+        url = m.group(1)
+        clean_url = url.split("?")[0]
+        if _is_product_big(url) and clean_url not in seen_images:
+            seen_images.add(clean_url)
+            result.main_images.append(clean_url)
+
+    # 策略2：从 CSS 注释提取 CDN URL
+    if not any(u.startswith("http") for u in result.main_images):
+        for m in re.finditer(r"/\*\s*original URL:\s*(https?://private\.zkh\.com/PRODUCT/BIG/BIG_[^\s*]+)\s*\*/", html):
+            url = m.group(1)
+            clean_url = url.split("?")[0]
+            if _is_product_big(url) and clean_url not in seen_images:
+                seen_images.add(clean_url)
+                result.main_images.append(clean_url)
+
+    # 策略3：兜底 — 从全 HTML 提取 BIG_ 文件名
+    if not any(u.startswith("http") for u in result.main_images):
+        for m in re.finditer(r"BIG_([A-Z0-9]+_\d+\.\w+)", html):
+            filename = m.group(0)
+            if not pid_filter or pid_filter in filename:
+                cdn_url = f"https://private.zkh.com/PRODUCT/BIG/{filename}"
+                if cdn_url not in seen_images:
+                    seen_images.add(cdn_url)
+                    result.main_images.append(cdn_url)
 
     # ── 9. SKU 变体 ──
     # 每个 SKU 项的结构：.sku-number + .sku-price-wrap-new 配对
@@ -389,11 +426,12 @@ def _parse_kv(text: str) -> tuple:
 
 def to_unified_detail(zkh: ZkhDetail) -> dict:
     """转换为 core.schema.UnifiedDetail 兼容的字典"""
-    total_images = sum(1 for v in zkh.sku_variants)  # placeholder
+    pid = zkh.product_id or zkh.sku_code
+    all_imgs = list(dict.fromkeys(zkh.main_images))
     return {
         "platform": "震坤行",
-        "product_id": zkh.product_id or zkh.sku_code,
-        "product_url": "",
+        "product_id": pid,
+        "product_url": f"https://www.zkh.com/product/detail/{pid}.html" if pid else "",
         "title": zkh.title,
         "brand": zkh.brand,
         "spec": zkh.model,
@@ -403,11 +441,17 @@ def to_unified_detail(zkh: ZkhDetail) -> dict:
         "min_order": zkh.min_order,
         "ship_from": zkh.ship_from,
         "sales_count": 0,
+        "yearly_sales": "",
+        "repurchase_rate": "",
+        "listing_date": "",
         "main_images": zkh.main_images,
         "detail_images": [],
-        "attributes": zkh.attributes,
+        "all_images": all_imgs,
+        "videos": [],
         "sku_count": len(zkh.sku_variants),
+        "attributes": zkh.attributes,
         "sku_matrix": [asdict(v) for v in zkh.sku_variants],
+        "color_options": [],
         "raw_data": zkh.raw_data,
     }
 
