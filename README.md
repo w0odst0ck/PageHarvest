@@ -30,9 +30,11 @@
 
 #### 详情页解析
 
-1. 浏览器打开商品详情页 → Ctrl+S 保存完整页面
+1. 浏览器打开商品详情页 → 使用 [SingleFile](https://github.com/gildas-lormeau/SingleFile) 保存完整页面（推荐，可保留图片 CDN 原始链接），或 Ctrl+S 保存
 2. 多个页面打包成 ZIP
 3. 上传到 PageHarvest → 自动解析品牌/价格/SKU/属性/主图
+
+> 1688 详情解析集成自 [jiyun/1688](https://github.com/jiyun/1688) 开源库（`data-sf-original-src` 提取图片 CDN 直链）。
 
 <img src="web/static/img/3.jpeg" width="700" alt="详情页解析">
 
