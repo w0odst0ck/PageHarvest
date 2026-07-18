@@ -24,6 +24,8 @@ web/static/detail-images/
 # 内存日志
 memory/
 
+# 子项目（自由开发，不混淆.git）
+
 # 项目日志（不提交）
 memory/
 
@@ -55,3 +57,17 @@ PLAN.md
 
 # 选品输出（含商品数据）
 output/
+
+# 日志
+*.log
+
+# 子项目 — 提交时不带缓存/敏感数据
+factory-monitor/data/
+factory-monitor/*/__pycache__/
+price-compare/cookies/
+price-compare/input/
+price-compare/__pycache__/
+price-compare/*/__pycache__/
+*.db
+*.sqlite
+:Zone.Identifier
