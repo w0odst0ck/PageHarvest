@@ -17,6 +17,7 @@ const PageHarvestParser = (() => {
 
   function detectPlatform(html) {
     if (AlibabaParser.detect(html)) return 'alibaba';
+    if (ZKHParser.detect(html)) return 'zkh';
     return 'unknown';
   }
 
@@ -58,6 +59,15 @@ const PageHarvestParser = (() => {
             parsedData = detail;
           }
         }
+      } else if (platform === 'zkh') {
+        if (mode === 'search') {
+          parsedData = ZKHParser.parseSearch(content);
+        } else if (mode === 'detail') {
+          const detail = ZKHParser.parseDetail(content);
+          if (detail && detail.title) {
+            parsedData = detail;
+          }
+        }
       }
 
       results.push({
@@ -85,7 +95,8 @@ const PageHarvestParser = (() => {
       const allRows = [];
       for (const r of results) {
         if (r.data && Array.isArray(r.data)) {
-          allRows.push(...AlibabaParser.toSearchRows(r.data));
+          const toRows = (r.platform === 'zkh') ? ZKHParser.toSearchRows : AlibabaParser.toSearchRows;
+          allRows.push(...toRows(r.data));
         }
       }
       output.rows = allRows;
@@ -93,13 +104,21 @@ const PageHarvestParser = (() => {
       output.json = JSON.stringify(results, null, 2);
       output.txt = generateSearchTXT(results);
     } else if (mode === 'detail') {
-      const detailResults = [];
+      const alibabaDetails = [];
+      const zkhDetails = [];
       for (const r of results) {
         if (r.data && r.data.title) {
-          detailResults.push(r.data);
+          if (r.platform === 'zkh') {
+            zkhDetails.push(r.data);
+          } else {
+            alibabaDetails.push(r.data);
+          }
         }
       }
-      output.rows = AlibabaParser.toDetailRows(detailResults);
+      output.rows = [
+        ...AlibabaParser.toDetailRows(alibabaDetails),
+        ...ZKHParser.toDetailRows(zkhDetails),
+      ];
       output.csv = generateCSV(output.rows);
       output.json = JSON.stringify(results, null, 2);
       output.txt = generateDetailTXT(results);

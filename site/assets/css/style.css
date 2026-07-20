@@ -427,6 +427,243 @@ pre { background: var(--surface-alt); border: 1px solid var(--border); border-ra
 .strategy-card p { font-size: 14px; color: var(--text-secondary); }
 .strategy-card code { font-size: 12px; }
 
+/* ── Tool Section (在线解析) ── */
+.tool-section {
+  padding: 24px 0 60px;
+}
+
+/* Drop Zone */
+.drop-zone {
+  background: var(--surface);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  margin-bottom: 24px;
+}
+
+.drop-zone:hover,
+.drop-zone.drag-over {
+  border-color: var(--primary);
+  background: rgba(26,86,219,.04);
+}
+
+.drop-zone-content {
+  pointer-events: none;
+}
+
+.drop-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.drop-text {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.drop-hint {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.mode-selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.mode-selector select {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.action-area {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.btn-secondary {
+  background: var(--surface-alt);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--border);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+/* Progress */
+.progress-area {
+  margin-bottom: 24px;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: var(--surface-alt);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  border-radius: 4px;
+  transition: width .3s ease;
+  width: 0%;
+}
+
+.progress-text {
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* Results */
+.results-area {
+  margin-bottom: 24px;
+}
+
+.results-area h2 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.result-summary {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.result-table-wrapper {
+  overflow-x: auto;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.result-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.result-table th,
+.result-table td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.result-table th {
+  background: var(--surface-alt);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  position: sticky;
+  top: 0;
+}
+
+.result-table tr:last-child td {
+  border-bottom: none;
+}
+
+.result-table tr:hover td {
+  background: rgba(26,86,219,.03);
+}
+
+.result-table .img-link {
+  display: inline-block;
+  padding: 2px 8px;
+  margin: 1px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--primary);
+  text-decoration: none;
+  transition: background .15s;
+}
+
+.result-table .img-link:hover {
+  background: var(--primary);
+  color: #fff;
+  text-decoration: none;
+}
+
+.download-area {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Error */
+.error-area {
+  margin-bottom: 24px;
+}
+
+.error-box {
+  background: rgba(220,38,38,.06);
+  border: 1px solid rgba(220,38,38,.2);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.error-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.error-text {
+  font-size: 14px;
+  color: #b91c1c;
+  line-height: 1.6;
+}
+
+@media (prefers-color-scheme: dark) {
+  .error-box {
+    background: rgba(220,38,38,.1);
+    border-color: rgba(220,38,38,.3);
+  }
+  .error-text {
+    color: #fca5a5;
+  }
+  .result-table .img-link {
+    color: var(--primary-light);
+  }
+}
+
 /* ── Download Section ── */
 .download-section {
   padding: 60px 0;

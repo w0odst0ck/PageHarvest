@@ -59,6 +59,20 @@ const AlibabaParser = (() => {
     return el ? (el.getAttribute(name) || '').trim() : '';
   }
 
+  // ── 通用图片提取 ──
+  // 尝试多个属性依次回退，兼容各种保存格式
+  function extractImages(container, selector, attrPriority) {
+    // attrPriority: ['data-sf-original-src', 'data-lazyload', 'data-src', 'src']
+    const imgs = container.querySelectorAll(selector);
+    return Array.from(imgs).map(img => {
+      for (const attr of attrPriority) {
+        const url = img.getAttribute(attr);
+        if (url && url.trim()) return url.trim();
+      }
+      return '';
+    }).filter(Boolean);
+  }
+
   // ── 搜索页解析 ──
   // 兼容两种结构：
   //   A) 新版: .offer-list-item-wrap
@@ -114,13 +128,11 @@ const AlibabaParser = (() => {
         const linkEl = item.querySelector('.offer-title-row a, .title a, a[href*="offer/"]');
         p.link = attr(linkEl || item.querySelector('a[href*="detail.1688.com"]'), 'href') || '';
 
-        // 图片
-        const imgEl = item.querySelector('.main-img, img[class*="img"], img[src*="alicdn"]');
-        p.images = [];
-        const src = attr(imgEl, 'src') || attr(imgEl, 'data-src') || '';
-        if (src && !src.startsWith('data:')) {
-          p.images.push(src);
-        }
+        // 图片（增强：尝试多个属性回退）
+        const attrPriority = ['data-sf-original-src', 'data-lazyload', 'data-src', 'src'];
+        const imgSelectors = '.main-img, img[class*="img"], img[src*="alicdn"], img[data-sf-original-src], img[data-lazyload]';
+        p.images = extractImages(item, imgSelectors, attrPriority)
+          .filter(url => !url.startsWith('data:'));
 
         // 店铺
         const shopEl = item.querySelector('.offer-shop-row, [class*="shop"] a');
@@ -331,28 +343,43 @@ const AlibabaParser = (() => {
     const seen = new Set();
     const images = [];
 
-    // 策略1: preview-img
-    const previewImgs = doc.querySelectorAll('img.ant-image-img.preview-img, img.preview-img');
+    // 策略1: preview-img (尝试多种属性回退)
+    const attrPriority = ['data-sf-original-src', 'data-lazyload', 'src', 'data-src'];
+    const previewImgs = doc.querySelectorAll('img.ant-image-img.preview-img, img.preview-img, img[class*="preview"], img[class*="gallery"]');
     previewImgs.forEach(img => {
-      let src = attr(img, 'src') || attr(img, 'data-sf-original-src') || '';
-      if (!src) {
-        // SingleFile 可能把 src 加密了，试试 data-sf-original-src
-        src = img.getAttribute('data-sf-original-src') || '';
-      }
-      const url = reconstructCdnUrl(src);
-      if (url && !seen.has(url)) {
-        seen.add(url);
-        images.push(url);
+      for (const attrName of attrPriority) {
+        const src = img.getAttribute(attrName);
+        if (src && src.trim()) {
+          const url = reconstructCdnUrl(src.trim());
+          if (url && !seen.has(url)) {
+            seen.add(url);
+            images.push(url);
+          }
+          break;
+        }
       }
     });
 
-    // 策略2: cbu01.alicdn.com 图片
+    // 策略2: cbu01.alicdn.com 图片（从 HTML 正则）
     if (images.length === 0) {
-      const re = /src="(https:\/\/cbu01\.alicdn\.com\/img\/ibank\/[^"]+)"/g;
+      const re = /src="(https?:\/\/cbu01\.alicdn\.com\/img\/ibank\/[^"]+)"/g;
       let m;
       while ((m = re.exec(html)) !== null) {
         const url = m[1];
         if (!url.includes('_88x88') && !seen.has(url)) {
+          seen.add(url);
+          images.push(url);
+        }
+      }
+    }
+
+    // 策略3: data-sf-original-src 中的 alicdn 链接（SingleFile 保存时常见）
+    if (images.length === 0) {
+      const re = /data-sf-original-src="(https?:\/\/[^"]*\.(?:jpg|jpeg|png|webp)[^"]*)"/g;
+      let m;
+      while ((m = re.exec(html)) !== null) {
+        const url = m[1];
+        if (!seen.has(url)) {
           seen.add(url);
           images.push(url);
         }

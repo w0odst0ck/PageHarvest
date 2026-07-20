@@ -88,10 +88,17 @@
       dropZone.classList.remove('drag-over');
 
       const files = e.dataTransfer.files;
-      if (files.length > 0 && files[0].name.endsWith('.zip')) {
-        handleFileSelect(files[0]);
-      } else {
-        showError('请拖拽一个 ZIP 文件');
+      if (files.length > 0) {
+        const file = files[0];
+        if (!file.name.endsWith('.zip')) {
+          showError('请拖拽 ZIP 格式的文件，当前文件类型不是 ZIP');
+          return;
+        }
+        if (file.size > 100 * 1024 * 1024) {
+          showError('文件过大（超过 100MB），建议不超过 50MB');
+          return;
+        }
+        handleFileSelect(file);
       }
     });
   }
@@ -109,6 +116,17 @@
   }
 
   function handleFileSelect(file) {
+    // 文件校验
+    if (!file) return;
+    if (!file.name.endsWith('.zip') && !file.name.endsWith('.ZIP')) {
+      showError('请选择 ZIP 格式的文件，选中的文件不是 ZIP 压缩包');
+      return;
+    }
+    if (file.size > 100 * 1024 * 1024) {
+      showError('文件过大（超过 100MB），建议不超过 50MB');
+      return;
+    }
+
     currentFile = file;
     updateParseButton();
 
@@ -118,7 +136,7 @@
     if (dropText) dropText.textContent = `📦 ${file.name}`;
     if (dropHint) dropHint.textContent = `(${(file.size / 1024).toFixed(1)} KB) 点击重新选择`;
 
-    hideElement(errorArea);
+    hideError();
     hideElement(resultsArea);
   }
 
@@ -137,25 +155,31 @@
   // ── 开始解析 ──
 
   async function startParsing() {
-    if (!currentFile) return;
+    if (!currentFile) {
+      showError('请先选择一个 ZIP 文件');
+      return;
+    }
 
     const mode = modeSelect ? modeSelect.value : 'search';
 
     // 重置 UI
-    hideElement(errorArea);
+    hideError();
     hideElement(resultsArea);
     showElement(progressArea);
     setProgress(0, '准备就绪...');
     parseBtn.disabled = true;
 
     try {
-      setProgress(10, '正在加载 JSZip...');
+      setProgress(5, '正在加载 JSZip...');
 
       // 确保 JSZip 已加载
       if (!window.JSZip) {
         // 尝试动态加载
         await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
-        if (!window.JSZip) throw new Error('JSZip 加载失败，请刷新页面重试');
+        if (!window.JSZip) {
+          showError('JSZip 库加载失败，请刷新页面后重试');
+          return;
+        }
       }
 
       // 确保 XLSX 已加载 (用于 Excel)
@@ -168,13 +192,35 @@
         }
       }
 
-      setProgress(20, '正在解压 ZIP 文件...');
+      setProgress(15, '正在解压 ZIP 文件...');
 
       // 执行解析
       const output = await PageHarvestParser.parseZip(currentFile, mode);
       currentOutput = output;
 
-      setProgress(70, `解析完成: ${output.success}/${output.total} 成功`);
+      // 检查解析结果
+      if (output.total === 0) {
+        showError('ZIP 中没有找到 HTML 文件，请确认压缩包内包含网页截图');
+        return;
+      }
+
+      // 检查平台识别情况
+      if (output.platform === 'unknown' || output.platform === 'mixed') {
+        // 检查是否所有文件都是 unknown
+        const unknownCount = output.results.filter(r => r.platform === 'unknown').length;
+        if (unknownCount === output.total) {
+          showError('无法识别页面平台，目前支持 1688。请确认 ZIP 中包含 1688 页面的 HTML 文件');
+          return;
+        }
+      }
+
+      // 检查数据是否为空
+      if (!output.rows || output.rows.length === 0) {
+        showError('未能提取到商品数据，请确认 HTML 内容完整包含商品信息');
+        return;
+      }
+
+      setProgress(80, `解析完成: ${output.success}/${output.total} 成功`);
 
       // 渲染结果
       renderResults(output, mode);
@@ -185,7 +231,12 @@
 
     } catch (err) {
       console.error('解析失败:', err);
-      showError(err.message || '解析过程中发生未知错误');
+      const msg = err.message || '';
+      if (msg.includes('JSZip') || msg.includes('loadAsync') || msg.includes('corrupt') || msg.includes('invalid')) {
+        showError('ZIP 文件无法打开，可能已损坏。请重新保存 HTML 后打包再试');
+      } else {
+        showError(msg || '解析过程中发生未知错误，请重试');
+      }
       hideElement(progressArea);
     } finally {
       parseBtn.disabled = false;
@@ -237,6 +288,9 @@
     }
     resultThead.appendChild(tr);
 
+    // 判断哪些列是图片列
+    const imageKeys = ['图片', '主图链接', '主图', 'images', 'main_images', 'mainImages'];
+
     // Tbody
     resultTbody.innerHTML = '';
     for (const row of rows) {
@@ -244,8 +298,25 @@
       for (const h of headers) {
         const td = document.createElement('td');
         const val = row[h];
+
+        // 图片列 — 渲染为可点击的缩略图链接
+        if (imageKeys.includes(h) && val) {
+          let urls = [];
+          if (typeof val === 'string') {
+            urls = val.split(/\n|,\s*/).filter(Boolean);
+          } else if (Array.isArray(val)) {
+            urls = val;
+          }
+          if (urls.length > 0) {
+            td.innerHTML = urls.map((url, i) =>
+              `<a href="${url}" target="_blank" title="${url}" class="img-link">图${i+1}</a>`
+            ).join(' ');
+          } else {
+            td.textContent = '-';
+          }
+        }
         // 长文本截断显示
-        if (typeof val === 'string' && val.length > 100) {
+        else if (typeof val === 'string' && val.length > 100) {
           td.textContent = val.substring(0, 100) + '...';
           td.title = val;
         } else {
@@ -267,61 +338,70 @@
   }
 
   function download(format) {
-    if (!currentOutput) return;
-
-    const mode = modeSelect ? modeSelect.value : 'search';
-    const baseName = PageHarvestParser.getFilename(mode);
-
-    let blob, filename;
-
-    switch (format) {
-      case 'csv': {
-        const content = PageHarvestParser.generateCSV(currentOutput.rows || []);
-        blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-        filename = `${baseName}.csv`;
-        break;
-      }
-      case 'xlsx': {
-        if (!currentOutput.xlsx) {
-          // 尝试用 XLSX 生成（如果之前没成功）
-          if (window.XLSX && currentOutput.rows) {
-            currentOutput.xlsx = PageHarvestParser.generateXLSX(currentOutput.rows);
-          }
-        }
-        if (currentOutput.xlsx) {
-          blob = new Blob([new Uint8Array(currentOutput.xlsx)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-          filename = `${baseName}.xlsx`;
-        } else {
-          showError('Excel 生成失败（缺少 xlsx 库）');
-          return;
-        }
-        break;
-      }
-      case 'txt': {
-        const content = PageHarvestParser.generateTXT(currentOutput.results || [], mode);
-        blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
-        filename = `${baseName}.txt`;
-        break;
-      }
-      case 'json': {
-        const content = currentOutput.json || JSON.stringify(currentOutput.results, null, 2);
-        blob = new Blob([content], { type: 'application/json;charset=utf-8;' });
-        filename = `${baseName}.json`;
-        break;
-      }
-      default:
-        return;
+    if (!currentOutput) {
+      showError('请先完成解析再下载报告');
+      return;
     }
 
-    // 触发下载
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+      const mode = modeSelect ? modeSelect.value : 'search';
+      const baseName = PageHarvestParser.getFilename(mode);
+
+      let blob, filename;
+
+      switch (format) {
+        case 'csv': {
+          const content = PageHarvestParser.generateCSV(currentOutput.rows || []);
+          blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+          filename = `${baseName}.csv`;
+          break;
+        }
+        case 'xlsx': {
+          if (!currentOutput.xlsx) {
+            // 尝试用 XLSX 生成（如果之前没成功）
+            if (window.XLSX && currentOutput.rows) {
+              currentOutput.xlsx = PageHarvestParser.generateXLSX(currentOutput.rows);
+            }
+          }
+          if (currentOutput.xlsx) {
+            blob = new Blob([new Uint8Array(currentOutput.xlsx)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            filename = `${baseName}.xlsx`;
+          } else {
+            showError('Excel 生成失败（缺少 xlsx 库），请尝试 CSV 格式');
+            return;
+          }
+          break;
+        }
+        case 'txt': {
+          const content = PageHarvestParser.generateTXT(currentOutput.results || [], mode);
+          blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+          filename = `${baseName}.txt`;
+          break;
+        }
+        case 'json': {
+          const content = currentOutput.json || JSON.stringify(currentOutput.results, null, 2);
+          blob = new Blob([content], { type: 'application/json;charset=utf-8;' });
+          filename = `${baseName}.json`;
+          break;
+        }
+        default:
+          return;
+      }
+
+      // 触发下载
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+    } catch (err) {
+      console.error('下载失败:', err);
+      showError('报告生成失败，请重试');
+    }
   }
 
   // ── 错误显示 ──
@@ -331,6 +411,12 @@
     showElement(errorArea);
     hideElement(resultsArea);
     hideElement(progressArea);
+    parseBtn.disabled = false;
+    updateParseButton();
+  }
+
+  function hideError() {
+    hideElement(errorArea);
   }
 
   // ── 工具函数 ──
