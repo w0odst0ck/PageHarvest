@@ -9,5 +9,5 @@ echo.
 echo   按 Ctrl+C 停止
 echo.
 
-python -m web.app
+python -m src.web.app
 pause

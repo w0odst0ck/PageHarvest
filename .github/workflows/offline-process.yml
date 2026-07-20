@@ -1,0 +1,62 @@
+# PageHarvest 离线解析工作流
+# 
+# 触发方式：
+#   1. workflow_dispatch（手动，需 ZIP 直链）
+#   2. issue_comment（Issue 评论贴 ZIP 附件）
+#   3. repository_dispatch（前端触发）
+#
+# 详见 plan/deployment.md
+
+name: 离线解析
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '模式: search / detail'
+        required: true
+        default: 'search'
+      zip_url:
+        description: 'ZIP 文件直链（可选）'
+        required: false
+
+jobs:
+  parse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install flask openpyxl beautifulsoup4 charset-normalizer
+
+      - name: Download input ZIP
+        if: inputs.zip_url != ''
+        run: |
+          curl -sL -o input.zip "${{ inputs.zip_url }}"
+          echo "ZIP 下载完成: $(ls -lh input.zip | awk '{print $5}')"
+
+      - name: Run offline parser
+        if: inputs.zip_url == ''
+        run: |
+          echo "请通过 ZIP 直链触发解析"
+          exit 1
+        # TODO: 支持 Issue 附件下载后自动解析
+
+      - name: Run offline parser
+        if: inputs.zip_url != ''
+        run: |
+          python -m cli.offline input.zip --out results/ --mode ${{ inputs.mode }}
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: 解析结果_${{ inputs.mode }}
+          path: results/
+          retention-days: 7

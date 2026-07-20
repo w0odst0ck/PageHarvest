@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>在线采集部署指南 — PageHarvest</title>
+  <meta name="description" content="PageHarvest 在线采集部署指南：面向开发者的自部署文档，包含安装步骤、使用示例和注意事项。">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><text y='16' fill='%231a56db'>✦</text></svg>">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="site-logo">
+        <span class="logo-icon">✦</span> PageHarvest
+      </a>
+      <button class="nav-toggle" id="navToggle" aria-label="菜单">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <nav>
+        <ul class="nav-links" id="navLinks">
+          <li><a href="index.html">首页</a></li>
+          <li><a href="guide.html">使用指南</a></li>
+          <li><a href="app.html">在线解析</a></li>
+          <li><a href="download.html">下载</a></li>
+          <li><a href="online.html" class="active">在线采集</a></li>
+          <li><a href="https://github.com/w0odst0ck/PageHarvest" target="_blank">GitHub</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="main-content">
+
+    <div class="page-header">
+      <h1>🌐 在线采集部署指南</h1>
+      <p>面向开发者 — 在线采集代码全部公开，用户自行部署</p>
+    </div>
+
+    <section class="deploy-section">
+
+      <!-- 策略说明 -->
+      <div class="deploy-block">
+        <h3>📋 策略说明</h3>
+        <p>
+          PageHarvest 的 <strong>离线分析</strong> 功能是面向终端用户的"产品"体验，
+          而 <strong>在线采集</strong> 部分的代码全部公开在 GitHub 仓库中，
+          供有技术能力的开发者自行部署和使用。
+        </p>
+        <p style="margin-top: 8px;">
+          <strong>简单说</strong>：不会代码的用户用离线 exe / Pages 上传 ZIP 解析；
+          会代码的开发者可以自建在线采集环境，获取实时数据。
+        </p>
+      </div>
+
+      <!-- 前置条件 -->
+      <div class="deploy-block">
+        <h3>📦 前置条件</h3>
+        <ul>
+          <li>Python 3.11+</li>
+          <li>Chrome 或 Chromium 浏览器（用于 Selenium 或 Playwright 驱动）</li>
+          <li>基本的 Python 环境和命令行操作能力</li>
+          <li>对目标电商平台的反爬策略有一定了解</li>
+        </ul>
+      </div>
+
+      <!-- 安装步骤 -->
+      <div class="deploy-block">
+        <h3>🔧 安装步骤</h3>
+        <ol>
+          <li>克隆仓库：
+            <pre><code>git clone https://github.com/w0odst0ck/PageHarvest.git
+cd PageHarvest</code></pre>
+          </li>
+          <li>安装依赖：
+            <pre><code>pip install -r requirements.txt</code></pre>
+          </li>
+          <li>（可选）安装浏览器驱动：<br>
+            <span style="color: var(--text-secondary); font-size: 14px;">采集依赖 Selenium/Playwright，需要对应浏览器的 WebDriver</span>
+<pre><code># 如果使用 Playwright
+playwright install chromium</code></pre>
+          </li>
+        </ol>
+      </div>
+
+      <!-- 使用示例 -->
+      <div class="deploy-block">
+        <h3>🚀 使用示例</h3>
+        <p><strong>在线采集搜索页</strong></p>
+        <pre><code>python -m cli.online --keyword 螺丝刀 --pages 3</code></pre>
+
+        <p style="margin-top: 16px;"><strong>采集指定 URL</strong></p>
+        <pre><code>python -m cli.online --url https://www.1688.com/... --mode detail</code></pre>
+
+        <p style="margin-top: 16px;"><strong>输出到指定目录</strong></p>
+        <pre><code>python -m cli.online --keyword 收纳盒 --pages 5 --out ./my_data/</code></pre>
+
+        <p style="margin-top: 16px;"><strong>离线解析已有 ZIP</strong></p>
+        <pre><code>python -m cli.offline input.zip --out ./results/</code></pre>
+      </div>
+
+      <!-- 注意事项 -->
+      <div class="deploy-block">
+        <h3>⚠️ 注意事项</h3>
+        <ul>
+          <li><strong>反爬机制</strong>：各平台均有不同程度的反爬限制，建议合理设置请求间隔</li>
+          <li><strong>IP 问题</strong>：大规模采集建议使用代理 IP 轮换，避免 IP 被封</li>
+          <li><strong>Cookie 配置</strong>：部分平台需要登录态，采集前需配置有效的 Cookie</li>
+          <li><strong>频率控制</strong>：请控制请求频率，避免对目标平台造成负担</li>
+          <li><strong>法律合规</strong>：请遵守目标平台的服务条款，仅用于个人学习和研究</li>
+          <li><strong>数据量</strong>：在线采集生成的 HTML 文件可用 CLI 离线解析，或上传到离线 exe 处理</li>
+        </ul>
+      </div>
+
+      <!-- 参考 -->
+      <div class="deploy-block">
+        <h3>📚 相关资源</h3>
+        <ul>
+          <li><a href="https://github.com/w0odst0ck/PageHarvest" target="_blank">GitHub 仓库</a> — 完整的在线采集代码</li>
+          <li><a href="https://github.com/w0odst0ck/PageHarvest/blob/main/README.md" target="_blank">README.md</a> — 项目文档</li>
+          <li><a href="guide.html">使用指南</a> — 离线分析使用教程（面向终端用户）</li>
+          <li><a href="download.html">下载页面</a> — 下载 exe / 查看源码</li>
+        </ul>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <span>PageHarvest — <a href="https://github.com/w0odst0ck/PageHarvest/blob/main/LICENSE">MIT License</a></span>
+      <div class="footer-links">
+        <a href="https://github.com/w0odst0ck/PageHarvest" target="_blank">GitHub</a>
+        <a href="https://github.com/w0odst0ck/PageHarvest/releases" target="_blank">Releases</a>
+        <a href="app.html">在线解析</a>
+        <a href="guide.html">使用指南</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

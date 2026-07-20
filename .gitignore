@@ -1,14 +1,7 @@
 # Python
 __pycache__/
 *.pyc
-.venv/
 *.egg-info/
-dist/
-
-# Chrome / Selenium
-chromedriver-win32/
-chrome_profile/
-.wdm_cache/
 
 # 数据目录（全部不提交）
 data/
@@ -19,26 +12,22 @@ build/
 *.spec
 
 # Web 运行时生成
-web/static/detail-images/
+src/web/static/detail-images/
 
-# 内存日志
-memory/
-
-# 子项目（自由开发，不混淆.git）
+# 虚拟环境
+.venv/
+venv/
 
 # 项目日志（不提交）
-memory/
+docs/memory/
 
-# Python
+# IDE
 .vscode/
 .idea/
 
 # 系统
 Thumbs.db
 .DS_Store
-
-# 1688库自身文件
-1688/1688/.gitignore
 
 # Sensitive config files
 *.env
@@ -47,10 +36,11 @@ Thumbs.db
 credentials*
 secrets*
 
-
 # 产品规划（内部文档）
-plan/
-PLAN.md
+docs/plan/
+
+# GitHub Pages 构建产物
+site/_site/
 
 # 教程（内部文档）
 教程/
@@ -62,12 +52,18 @@ output/
 *.log
 
 # 子项目 — 提交时不带缓存/敏感数据
-factory-monitor/data/
-factory-monitor/*/__pycache__/
-price-compare/cookies/
-price-compare/input/
-price-compare/__pycache__/
-price-compare/*/__pycache__/
+modules/factory-monitor/data/
+modules/factory-monitor/*/__pycache__/
+modules/price-compare/cookies/
+modules/price-compare/input/
+modules/price-compare/__pycache__/
+modules/price-compare/*/__pycache__/
 *.db
 *.sqlite
 :Zone.Identifier
+
+# CLI 缓存
+src/cli/__pycache__/
+
+# 运行日志
+ph_debug.log

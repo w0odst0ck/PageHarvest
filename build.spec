@@ -12,25 +12,27 @@ try:
 except NameError:
     ROOT = Path(sys.argv[0]).resolve().parent
 
-# 需要包含的 Python 包
-PACKAGES = ['api', 'core', 'platforms', 'selection', 'gap']
+_SRC = ROOT / "src"
+
+# 需要包含的 Python 包（路径相对于 src/）
+PACKAGES = ['api', 'core', 'platforms', 'selection', 'gap', 'cli']
 
 # 资源文件
 DATAS = []
 for pkg in PACKAGES:
-    src = ROOT / pkg
+    src = _SRC / pkg
     if src.is_dir():
         DATAS.append((str(src), pkg))
 
-# Web 前端资源
+# Web 前端资源（路径相对于 src/）
 for res in ['web/templates', 'web/static']:
-    src = ROOT / res
+    src = _SRC / res
     if src.is_dir():
-        DATAS.append((str(src), res))
+        DATAS.append((str(src), 'web'))
 
 a = Analysis(
-    ['web/app.py'],
-    pathex=[str(ROOT)],
+    ['src/web/app.py'],
+    pathex=[str(ROOT), str(_SRC)],
     binaries=[],
     datas=DATAS,
     hiddenimports=[

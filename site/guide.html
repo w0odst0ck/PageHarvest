@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>使用指南 — PageHarvest</title>
+  <meta name="description" content="PageHarvest 完整使用教程：安装油猴脚本、采集 HTML、打包上传、解析输出报告的逐步指南。">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><text y='16' fill='%231a56db'>✦</text></svg>">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="site-logo">
+        <span class="logo-icon">✦</span> PageHarvest
+      </a>
+      <button class="nav-toggle" id="navToggle" aria-label="菜单">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <nav>
+        <ul class="nav-links" id="navLinks">
+          <li><a href="index.html">首页</a></li>
+          <li><a href="guide.html" class="active">使用指南</a></li>
+          <li><a href="app.html">在线解析</a></li>
+          <li><a href="download.html">下载</a></li>
+          <li><a href="online.html">在线采集</a></li>
+          <li><a href="https://github.com/w0odst0ck/PageHarvest" target="_blank">GitHub</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="main-content">
+
+    <div class="page-header">
+      <h1>📖 使用指南</h1>
+      <p>分步教程：从采集 HTML 到生成结构化报告</p>
+    </div>
+
+    <section class="guide-section">
+
+      <!-- Step 1 -->
+      <div class="guide-step">
+        <h3><span class="step-number">1</span> 安装油猴脚本</h3>
+        <p>在浏览器中安装 <strong>Tampermonkey</strong> 或 <strong>Violentmonkey</strong> 扩展，然后安装下方脚本。</p>
+
+        <table class="guide-script-table">
+          <thead>
+            <tr>
+              <th>脚本</th>
+              <th>平台</th>
+              <th>用途</th>
+              <th>安装</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1688 自动翻页+保存 v1.4</td>
+              <td>🏭 1688</td>
+              <td>搜索页自动翻页、保存 HTML</td>
+              <td><a href="https://greasyfork.org/zh-CN/scripts/586397" target="_blank">Greasy Fork 安装 →</a></td>
+            </tr>
+            <tr>
+              <td>震坤行 HTML 下载器 v9.2</td>
+              <td>🔩 震坤行</td>
+              <td>SPA 适配，自动翻页+保存 HTML</td>
+              <td><a href="https://greasyfork.org/zh-CN/scripts/586396" target="_blank">Greasy Fork 安装 →</a></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="tip-box">
+          💡 <strong>1688 用户推荐</strong>：还可安装 <strong>1688 采购助手</strong> 浏览器插件，搜索页自动提取数据并导出 XLSX，上传 PageHarvest 数据比 HTML 更完整。
+        </div>
+
+        <div class="warn-box">
+          ⚠️ <strong>京东用户</strong>：由于反爬机制极严，无法通过油猴自动采集。请使用浏览器手动搜索 → 逐页 Ctrl+S 保存 → 打包上传。详情页解析仍支持。
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="guide-step">
+        <h3><span class="step-number">2</span> 在电商平台搜索产品</h3>
+        <p>在目标平台搜索你想要分析的关键词。脚本会自动翻页采集所有搜索结果。</p>
+        <p>如果你的平台没有油猴脚本支持（如京东），手动操作即可：</p>
+        <ul>
+          <li>搜索目标关键词</li>
+          <li>逐页浏览搜索结果</li>
+          <li>用浏览器 Ctrl+S 保存完整页面</li>
+        </ul>
+
+        <div class="placeholder-img">搜索页 HTML 保存示意图 — 对应仓库 web/static/img/1.jpeg</div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="guide-step">
+        <h3><span class="step-number">3</span> 保存 HTML 文件</h3>
+        <p>有两种获取 HTML 的方式：</p>
+
+        <p><strong>方式 A：油猴脚本自动保存</strong></p>
+        <ul>
+          <li>安装对应平台的油猴脚本后，脚本会自动翻页并保存页面 HTML</li>
+          <li>文件默认保存在浏览器的下载目录中</li>
+        </ul>
+
+        <p><strong>方式 B：手动保存（适用于所有平台）</strong></p>
+        <ul>
+          <li>打开商品详情页</li>
+          <li>推荐使用 <a href="https://github.com/gildas-lormeau/SingleFile" target="_blank">SingleFile</a> 扩展保存完整页面（可保留图片 CDN 原始链接）</li>
+          <li>或直接 Ctrl+S（Windows/Linux）/ Cmd+S（Mac）保存为 HTML</li>
+          <li>详情页模式：多个页面打包在一起</li>
+        </ul>
+
+        <div class="placeholder-img">详情页保存示意图 — 对应仓库 web/static/img/3.jpeg</div>
+
+        <div class="tip-box">
+          💡 <strong>1688 详情解析</strong>：集成自开源库 jiyun/1688，支持 <code>data-sf-original-src</code> 提取图片 CDN 直链。
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="guide-step">
+        <h3><span class="step-number">4</span> 打包成 ZIP</h3>
+        <p>将所有 HTML 文件放入一个文件夹，打包成 ZIP 压缩包。</p>
+        <ul>
+          <li>文件命名没有限制，程序会自动识别 HTML 文件</li>
+          <li>一个 ZIP 中可以包含多个搜索页或详情页</li>
+          <li>建议每个分析任务单独打包</li>
+          <li>ZIP 体积建议不超过 50MB</li>
+        </ul>
+      </div>
+
+      <!-- Step 5 -->
+      <div class="guide-step">
+        <h3><span class="step-number">5</span> 上传解析</h3>
+        <p>两种方式任选其一：</p>
+
+        <p><strong>方式 A：下载 exe，本地运行（推荐）</strong></p>
+        <ol>
+          <li>从 <a href="download.html">下载页面</a> 获取 PageHarvest.exe</li>
+          <li>双击运行，浏览器自动打开 <code>http://localhost:8080</code></li>
+          <li>在页面上选择模式：<strong>搜索页选品</strong> 或 <strong>详情页解析</strong></li>
+          <li>拖拽或选择 ZIP 文件上传</li>
+          <li>等待解析完成（进度条自动刷新）</li>
+        </ol>
+
+        <p><strong>方式 B：（建设中）通过 GitHub Actions 在线解析</strong></p>
+        <ol>
+          <li>访问 PageHarvest GitHub 仓库</li>
+          <li>通过 workflow_dispatch 手动触发离线解析工作流</li>
+          <li>上传 ZIP 或提供文件直链</li>
+          <li>从 Actions Artifact 下载结果</li>
+        </ol>
+
+        <div class="placeholder-img">解析上传界面示意图 — 对应仓库 web/static/img/2.jpeg</div>
+
+        <div class="tip-box">
+          💡 <strong>CLI 模式</strong>：开发者也可直接通过命令行运行：<br>
+          <code>python -m cli.offline input.zip --out ./results/</code>
+        </div>
+      </div>
+
+      <!-- Step 6 -->
+      <div class="guide-step">
+        <h3><span class="step-number">6</span> 下载报告</h3>
+        <p>解析完成后，你可以下载以下格式的数据：</p>
+
+        <table class="guide-script-table">
+          <thead>
+            <tr>
+              <th>格式</th>
+              <th>内容</th>
+              <th>用途</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>CSV</td>
+              <td>结构化数据表格</td>
+              <td>Excel / WPS 直接打开，做数据分析</td>
+            </tr>
+            <tr>
+              <td>Excel</td>
+              <td>完整解析数据（详情页模式下所有字段展开）</td>
+              <td>需要查看完整属性、SKU 变体时使用</td>
+            </tr>
+            <tr>
+              <td>TXT</td>
+              <td>可读报告摘要</td>
+              <td>快速浏览分析结论</td>
+            </tr>
+            <tr>
+              <td>JSON</td>
+              <td>含原始解析数据的完整导出</td>
+              <td>二次开发或数据整合</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="tip-box">
+          💡 <strong>搜索页选品</strong>：输出推荐清单（按策略分层），含排名、价格、销量等关键字段。<br>
+          <strong>详情页解析</strong>：输出品牌、价格、SKU 变体、属性、主图等结构化数据。
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <span>PageHarvest — <a href="https://github.com/w0odst0ck/PageHarvest/blob/main/LICENSE">MIT License</a></span>
+      <div class="footer-links">
+        <a href="https://github.com/w0odst0ck/PageHarvest" target="_blank">GitHub</a>
+        <a href="https://github.com/w0odst0ck/PageHarvest/releases" target="_blank">Releases</a>
+        <a href="app.html">在线解析</a>
+        <a href="guide.html">使用指南</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

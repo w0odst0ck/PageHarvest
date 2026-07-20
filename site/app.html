@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>在线解析 — PageHarvest</title>
+  <meta name="description" content="拖拽上传电商平台 HTML 截图 ZIP，自动解析商品数据，在线下载报告。数据不离开浏览器。">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><text y='16' fill='%231a56db'>✦</text></svg>">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="site-logo">
+        <span class="logo-icon">✦</span> PageHarvest
+      </a>
+      <button class="nav-toggle" id="navToggle" aria-label="菜单">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <nav>
+        <ul class="nav-links" id="navLinks">
+          <li><a href="index.html">首页</a></li>
+          <li><a href="guide.html">使用指南</a></li>
+          <li><a href="app.html" class="active">在线解析</a></li>
+          <li><a href="download.html">下载</a></li>
+          <li><a href="https://github.com/w0odst0ck/PageHarvest" target="_blank">GitHub</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Page Header -->
+  <section class="page-header">
+    <div class="container">
+      <h1>在线解析</h1>
+      <p>拖拽上传 ZIP，自动提取商品数据，直接在浏览器下载报告。</p>
+      <p class="privacy-note">🔒 数据只在你的浏览器中处理，不上传到任何服务器。</p>
+    </div>
+  </section>
+
+  <!-- Tool Section -->
+  <section class="tool-section">
+    <div class="container">
+
+      <!-- Drop Zone -->
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-zone-content">
+          <div class="drop-icon">📁</div>
+          <p class="drop-text">拖拽 ZIP 文件到此处</p>
+          <p class="drop-hint">或点击选择文件</p>
+          <input type="file" id="fileInput" accept=".zip" hidden>
+        </div>
+      </div>
+
+      <!-- Mode Selector -->
+      <div class="mode-selector">
+        <label for="modeSelect">解析模式：</label>
+        <select id="modeSelect">
+          <option value="search">搜索页选品</option>
+          <option value="detail">详情页解析</option>
+        </select>
+      </div>
+
+      <!-- Action Button -->
+      <div class="action-area">
+        <button class="btn btn-primary" id="parseBtn" disabled>开始解析</button>
+      </div>
+
+      <!-- Progress -->
+      <div class="progress-area" id="progressArea" hidden>
+        <div class="progress-bar-container">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <p class="progress-text" id="progressText">准备中...</p>
+      </div>
+
+      <!-- Results -->
+      <div class="results-area" id="resultsArea" hidden>
+        <h2>解析结果</h2>
+        <div class="result-summary" id="resultSummary"></div>
+        <div class="result-table-wrapper">
+          <table class="result-table" id="resultTable">
+            <thead id="resultThead"></thead>
+            <tbody id="resultTbody"></tbody>
+          </table>
+        </div>
+        <div class="download-area">
+          <button class="btn btn-secondary" id="downloadCsvBtn">↓ 下载 CSV</button>
+          <button class="btn btn-secondary" id="downloadXlsxBtn">↓ 下载 Excel</button>
+          <button class="btn btn-secondary" id="downloadTxtBtn">↓ 下载报告 (TXT)</button>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div class="error-area" id="errorArea" hidden>
+        <div class="error-box">
+          <p class="error-icon">⚠️</p>
+          <p class="error-text" id="errorText"></p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-info">
+        <p>PageHarvest — 选品分析工具</p>
+        <p>数据在本地浏览器处理，不上传服务器</p>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/w0odst0ck/PageHarvest" target="_blank">GitHub</a>
+        <span class="sep">·</span>
+        <a href="guide.html">使用指南</a>
+        <span class="sep">·</span>
+        <a href="download.html">下载</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <!--
+    TODO: 实现阶段引入以下依赖和模块
+    <script src="assets/js/lib/jszip.min.js"></script>
+    <script src="assets/js/lib/xlsx.full.min.js"></script>
+    <script src="assets/js/parsers/alibaba.js"></script>
+    <script src="assets/js/parsers/zkh.js"></script>
+    <script src="assets/js/parsers/jingdong.js"></script>
+    <script src="assets/js/parser.js"></script>
+    <script src="assets/js/app.js"></script>
+  -->
+  <script src="assets/js/main.js"></script>
+
+</body>
+</html>

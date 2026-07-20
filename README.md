@@ -2,19 +2,36 @@
 
 > 上传平台搜索页/详情页 ZIP → 自动识别 → 输出结构化报告
 >
-> 三平台（1688 / 震坤行 / 京东）支持。单文件 exe，双击即用，零环境依赖。
+> 三平台（1688 / 震坤行 / 京东）支持。
+> 离线分析 = 产品，在线采集 = 开源。
 
 ---
 
 ## 快速开始
 
-### 下载
+### 在线使用（免费，无需安装，数据本地化）
+
+👉 **[pageharvest.github.io/app.html](https://w0odst0ck.github.io/PageHarvest/app.html)**
+
+拖拽上传 ZIP，浏览器自动解析商品数据，直接下载报告。
+**数据全程在你的浏览器中处理，不会上传到任何服务器。**
+不需要注册账号，不需要安装任何软件。
+
+### 下载 exe
 
 从 [Releases](https://github.com/w0odst0ck/PageHarvest/releases) 下载 `PageHarvest.exe`
 
-### 启动
+双击运行，浏览器打开 `http://localhost:8080`
 
-双击 `PageHarvest.exe`，浏览器打开 `http://localhost:8080`
+### CLI 运行
+
+```bash
+# 离线解析 ZIP
+python -m cli.offline input.zip --out ./results/
+
+# 在线采集（自部署）
+python -m cli.online --keyword 螺丝刀 --pages 3
+```
 
 <img src="web/static/img/1.jpeg" width="700" alt="首页">
 

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PageHarvest — 选品分析工具</title>
+  <meta name="description" content="上传电商平台搜索页/详情页 ZIP → 自动识别 → 输出结构化报告。支持 1688、震坤行、京东。离线分析，数据不上传。">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><text y='16' fill='%231a56db'>✦</text></svg>">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="site-logo">
+        <span class="logo-icon">✦</span> PageHarvest
+      </a>
+      <button class="nav-toggle" id="navToggle" aria-label="菜单">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <nav>
+        <ul class="nav-links" id="navLinks">
+          <li><a href="index.html" class="active">首页</a></li>
+          <li><a href="guide.html">使用指南</a></li>
+          <li><a href="app.html">在线解析</a></li>
+          <li><a href="download.html">下载</a></li>
+          <li><a href="online.html">在线采集</a></li>
+          <li><a href="https://github.com/w0odst0ck/PageHarvest" target="_blank">GitHub</a></li>
+          <li><a href="guide.html" class="nav-cta">开始使用 →</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="main-content">
+
+    <!-- Hero -->
+    <section class="hero">
+      <h1>
+        <span class="highlight">选品分析</span>，一键完成
+      </h1>
+      <p class="subtitle">
+        上传平台搜索页或详情页的 ZIP 文件 → 自动识别平台 → 输出结构化报告。<br>
+        支持 1688 · 震坤行 · 京东，离线处理，数据不上传。
+      </p>
+      <div class="hero-cta">
+        <a href="app.html" class="btn btn-primary">▶ 在线解析</a>
+        <a href="guide.html" class="btn btn-outline">📖 使用指南</a>
+        <a href="download.html" class="btn btn-outline">⬇ 下载 exe</a>
+      </div>
+      <div class="hero-platforms">
+        <span class="platform-badge"><span class="badge-icon">🏭</span> 1688</span>
+        <span class="platform-badge"><span class="badge-icon">🔩</span> 震坤行</span>
+        <span class="platform-badge"><span class="badge-icon">🛒</span> 京东</span>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="features">
+      <h2 class="section-title">为什么选择 PageHarvest</h2>
+      <p class="section-subtitle">专注于电商选品分析的数据工具，从采集到报告，纯本地运行</p>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🔒</div>
+          <h3>离线优先，数据安全</h3>
+          <p>所有解析在本地完成，ZIP 文件不上传服务器。隐私敏感用户的理想选择。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🎯</div>
+          <h3>三平台统一解析</h3>
+          <p>1688、震坤行、京东搜索页和详情页，一套工具全搞定。自动识别平台。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📊</div>
+          <h3>结构化数据输出</h3>
+          <p>CSV / Excel / TXT / JSON 多种格式可选。品牌、价格、SKU、属性全提取。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔄</div>
+          <h3>油猴脚本辅助采集</h3>
+          <p>1688 和震坤行提供开箱即用的油猴脚本，自动翻页+保存 HTML，省时省力。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🆓</div>
+          <h3>完全免费开源</h3>
+          <p>MIT 许可证，源码公开。在线采集代码全部可见，用户可自部署，不必担心锁死。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3>操作简单</h3>
+          <p>下载即用，无需配置环境。上传 ZIP → 等待解析 → 下载报告，三步搞定。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="how-it-works">
+      <h2 class="section-title">使用流程</h2>
+      <p class="section-subtitle">从采集到报告，四个简单步骤</p>
+      <div class="steps">
+        <div class="step">
+          <h4>安装油猴脚本</h4>
+          <p>安装浏览器脚本，自动翻页采集搜索页 HTML，或手动 Ctrl+S 保存详情页</p>
+        </div>
+        <div class="step">
+          <h4>打包 ZIP</h4>
+          <p>将保存的 HTML 文件打包成一个 ZIP 压缩包，文件命名不限</p>
+        </div>
+        <div class="step">
+          <h4>上传解析</h4>
+          <p>通过 exe 应用或 CLI 上传 ZIP，工具自动识别平台并提取商品数据</p>
+        </div>
+        <div class="step">
+          <h4>下载报告</h4>
+          <p>获取结构化 CSV/Excel 报告，直接用于选品分析和决策</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Strategy -->
+    <section class="strategy">
+      <h2 class="section-title">产品策略</h2>
+      <p class="section-subtitle">离线分析 = 产品，在线采集 = 开源</p>
+      <div class="strategy-cards">
+        <div class="strategy-card">
+          <span class="card-label label-product">产品</span>
+          <h3>离线解析（GitHub Pages）</h3>
+          <p>上传 ZIP 即用，纯静态页面 + GitHub Actions 后台解析。零部署，零费用，数据不上传第三方。</p>
+        </div>
+        <div class="strategy-card">
+          <span class="card-label label-local">本地 exe</span>
+          <h3>本地客户端</h3>
+          <p>PyInstaller 打包的单文件 exe，双击运行。无需网络，完全离线，隐私敏感用户首选。</p>
+        </div>
+        <div class="strategy-card">
+          <span class="card-label label-open">开源</span>
+          <h3>在线采集（自部署）</h3>
+          <p>在线采集代码全部公开，有技术能力的用户可自行部署。适用于需要实时数据采集的场景。</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <span>PageHarvest — <a href="https://github.com/w0odst0ck/PageHarvest/blob/main/LICENSE">MIT License</a></span>
+      <div class="footer-links">
+        <a href="https://github.com/w0odst0ck/PageHarvest" target="_blank">GitHub</a>
+        <a href="https://github.com/w0odst0ck/PageHarvest/releases" target="_blank">Releases</a>
+        <a href="app.html">在线解析</a>
+        <a href="guide.html">使用指南</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>
