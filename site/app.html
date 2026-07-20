@@ -93,7 +93,8 @@
         <div class="download-area">
           <button class="btn btn-secondary" id="downloadCsvBtn">↓ 下载 CSV</button>
           <button class="btn btn-secondary" id="downloadXlsxBtn">↓ 下载 Excel</button>
-          <button class="btn btn-secondary" id="downloadTxtBtn">↓ 下载报告 (TXT)</button>
+          <button class="btn btn-secondary" id="downloadTxtBtn">↓ 报告 (TXT)</button>
+          <button class="btn btn-secondary" id="downloadJsonBtn">↓ JSON</button>
         </div>
       </div>
 
@@ -126,17 +127,18 @@
   </footer>
 
   <!-- Scripts -->
-  <!--
-    TODO: 实现阶段引入以下依赖和模块
-    <script src="assets/js/lib/jszip.min.js"></script>
-    <script src="assets/js/lib/xlsx.full.min.js"></script>
-    <script src="assets/js/parsers/alibaba.js"></script>
-    <script src="assets/js/parsers/zkh.js"></script>
-    <script src="assets/js/parsers/jingdong.js"></script>
-    <script src="assets/js/parser.js"></script>
-    <script src="assets/js/app.js"></script>
-  -->
-  <script src="assets/js/main.js"></script>
+  <!-- JSZip — 解压 ZIP -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script>window.JSZip || document.write('<script src="assets/js/lib/jszip.min.js"><\/script>')</script>
+
+  <!-- SheetJS — 生成 Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script>window.XLSX || document.write('<script src="assets/js/lib/xlsx.full.min.js"><\/script>')</script>
+
+  <!-- 解析器 -->
+  <script src="assets/js/parsers/alibaba.js"></script>
+  <script src="assets/js/parser.js"></script>
+  <script src="assets/js/app.js"></script>
 
 </body>
 </html>
