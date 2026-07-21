@@ -6,7 +6,7 @@
  *   2. ZIP 解压 + 解析调度
  *   3. CSV / JSON / XLSX / TXT 生成
  *
- * 依赖: AlibabaParser (parsers/alibaba.js), JSZip, XLSX
+ * 依赖: AlibabaParser (parsers/alibaba.js), ZKHParser (parsers/zkh.js), JDParser (parsers/jingdong.js), JSZip, XLSX
  */
 
 'use strict';
@@ -18,6 +18,7 @@ const PageHarvestParser = (() => {
   function detectPlatform(html) {
     if (AlibabaParser.detect(html)) return 'alibaba';
     if (ZKHParser.detect(html)) return 'zkh';
+    if (JDParser.detect(html)) return 'jingdong';
     return 'unknown';
   }
 
@@ -102,6 +103,15 @@ const PageHarvestParser = (() => {
             parsedData = detail;
           }
         }
+      } else if (platform === 'jingdong') {
+        if (mode === 'search') {
+          parsedData = JDParser.parseSearch(content);
+        } else if (mode === 'detail') {
+          const detail = JDParser.parseDetail(content);
+          if (detail && detail.title) {
+            parsedData = detail;
+          }
+        }
       }
 
       results.push({
@@ -129,7 +139,8 @@ const PageHarvestParser = (() => {
       const allRows = [];
       for (const r of results) {
         if (r.data && Array.isArray(r.data)) {
-          const toRows = (r.platform === 'zkh') ? ZKHParser.toSearchRows : AlibabaParser.toSearchRows;
+          const toRows = (r.platform === 'zkh') ? ZKHParser.toSearchRows :
+                          (r.platform === 'jingdong') ? JDParser.toSearchRows : AlibabaParser.toSearchRows;
           allRows.push(...toRows(r.data));
         }
       }
@@ -140,10 +151,13 @@ const PageHarvestParser = (() => {
     } else if (mode === 'detail') {
       const alibabaDetails = [];
       const zkhDetails = [];
+      const jdDetails = [];
       for (const r of results) {
         if (r.data && r.data.title) {
           if (r.platform === 'zkh') {
             zkhDetails.push(r.data);
+          } else if (r.platform === 'jingdong') {
+            jdDetails.push(r.data);
           } else {
             alibabaDetails.push(r.data);
           }
@@ -152,6 +166,7 @@ const PageHarvestParser = (() => {
       output.rows = [
         ...AlibabaParser.toDetailRows(alibabaDetails),
         ...ZKHParser.toDetailRows(zkhDetails),
+        ...JDParser.toDetailRows(jdDetails),
       ];
       output.csv = generateCSV(output.rows);
       output.json = JSON.stringify(results, null, 2);

@@ -204,11 +204,11 @@
       }
 
       if (scan.platform === 'unknown') {
-        showError('无法识别页面平台，目前支持 1688 和震坤行。请确认 ZIP 中包含对应平台的 HTML 文件（扫描样本: ' + scan.sampleFile + '）');
+        showError('无法识别页面平台，目前支持 1688、震坤行和京东。请确认 ZIP 中包含对应平台的 HTML 文件（扫描样本: ' + scan.sampleFile + '）');
         return;
       }
 
-      setProgress(25, '检测到 ' + scan.totalHtml + ' 个 HTML 文件，平台: ' + (scan.platform === 'alibaba' ? '1688' : '震坤行') + '，开始解析...');
+      setProgress(25, '检测到 ' + scan.totalHtml + ' 个 HTML 文件，平台: ' + (scan.platform === 'alibaba' ? '1688' : (scan.platform === 'zkh' ? '震坤行' : '京东')) + '，开始解析...');
 
       // 执行解析
       const output = await PageHarvestParser.parseZip(currentFile, mode);
@@ -222,7 +222,7 @@
 
       // 检查平台识别情况
       if (output.platform === 'unknown') {
-        showError('无法识别页面平台，目前支持 1688 和震坤行。请确认 ZIP 中包含对应平台的 HTML 文件');
+        showError('无法识别页面平台，目前支持 1688、震坤行和京东。请确认 ZIP 中包含对应平台的 HTML 文件');
         return;
       }
 
@@ -266,7 +266,7 @@
 
   function renderResults(output, mode) {
     if (!output.rows || output.rows.length === 0) {
-      showError('解析成功但没有提取到任何数据。请确认 ZIP 中包含正确的 1688 或震坤行 HTML 文件。');
+      showError('解析成功但没有提取到任何数据。请确认 ZIP 中包含正确的 1688、震坤行或京东 HTML 文件。');
       return;
     }
 
