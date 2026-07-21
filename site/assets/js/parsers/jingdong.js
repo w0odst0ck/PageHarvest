@@ -97,7 +97,7 @@ const JDParser = (() => {
 
     // 从属性表补充品牌和型号
     if (!detail.brand && attrs['品牌']) detail.brand = attrs['品牌'];
-    if (!detail.model && attrs['商品编号']) detail.model = attrs['商品编号'];
+    if (!detail.model && (attrs['国补备案型号'] || attrs['型号'] || attrs['商品型号'])) detail.model = attrs['国补备案型号'] || attrs['型号'] || attrs['商品型号'];
     if (!detail.product_id && attrs['商品编号']) detail.product_id = attrs['商品编号'];
 
     // 新版高亮属性
