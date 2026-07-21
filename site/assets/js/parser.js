@@ -21,6 +21,40 @@ const PageHarvestParser = (() => {
     return 'unknown';
   }
 
+  // ── ZIP 快速扫描（提前检测平台，不等全量解析） ──
+
+  async function quickScan(zipFile) {
+    if (!window.JSZip) {
+      throw new Error('JSZip 库未加载');
+    }
+
+    const zip = await JSZip.loadAsync(zipFile);
+
+    // 找第一个 HTML 文件
+    let firstHtml = null;
+    let totalHtml = 0;
+    zip.forEach((relativePath, entry) => {
+      if (!entry.dir && /\.html?$/i.test(relativePath)) {
+        totalHtml++;
+        if (!firstHtml) firstHtml = { path: relativePath, entry };
+      }
+    });
+
+    if (!firstHtml) {
+      return { platform: 'unknown', totalHtml: 0, totalFiles: Object.keys(zip.files).length };
+    }
+
+    const content = await firstHtml.entry.async('string');
+    const platform = detectPlatform(content);
+
+    return {
+      platform,
+      totalHtml,
+      totalFiles: Object.keys(zip.files).length,
+      sampleFile: firstHtml.path,
+    };
+  }
+
   // ── ZIP 解析 ──
 
   async function parseZip(zipFile, mode) {
@@ -271,6 +305,7 @@ const PageHarvestParser = (() => {
 
   return {
     detectPlatform,
+    quickScan,
     parseZip,
     generateCSV,
     generateJSON,

@@ -194,6 +194,22 @@
 
       setProgress(15, '正在解压 ZIP 文件...');
 
+      // 快速扫描：提前检测平台和文件数量
+      setProgress(20, '正在检测页面平台...');
+      const scan = await PageHarvestParser.quickScan(currentFile);
+
+      if (scan.totalHtml === 0) {
+        showError('ZIP 中没有找到 HTML 文件，该压缩包包含 ' + scan.totalFiles + ' 个文件，但没有 .html 网页文件。请确认压缩包内包含网页截图');
+        return;
+      }
+
+      if (scan.platform === 'unknown') {
+        showError('无法识别页面平台，目前支持 1688 和震坤行。请确认 ZIP 中包含对应平台的 HTML 文件（扫描样本: ' + scan.sampleFile + '）');
+        return;
+      }
+
+      setProgress(25, '检测到 ' + scan.totalHtml + ' 个 HTML 文件，平台: ' + (scan.platform === 'alibaba' ? '1688' : '震坤行') + '，开始解析...');
+
       // 执行解析
       const output = await PageHarvestParser.parseZip(currentFile, mode);
       currentOutput = output;
@@ -205,13 +221,9 @@
       }
 
       // 检查平台识别情况
-      if (output.platform === 'unknown' || output.platform === 'mixed') {
-        // 检查是否所有文件都是 unknown
-        const unknownCount = output.results.filter(r => r.platform === 'unknown').length;
-        if (unknownCount === output.total) {
-          showError('无法识别页面平台，目前支持 1688。请确认 ZIP 中包含 1688 页面的 HTML 文件');
-          return;
-        }
+      if (output.platform === 'unknown') {
+        showError('无法识别页面平台，目前支持 1688 和震坤行。请确认 ZIP 中包含对应平台的 HTML 文件');
+        return;
       }
 
       // 检查数据是否为空
@@ -240,7 +252,6 @@
       hideElement(progressArea);
     } finally {
       parseBtn.disabled = false;
-      updateParseButton();
     }
   }
 
@@ -255,7 +266,7 @@
 
   function renderResults(output, mode) {
     if (!output.rows || output.rows.length === 0) {
-      showError('解析成功但没有提取到任何数据。请确认 ZIP 中包含正确的 1688 HTML 文件。');
+      showError('解析成功但没有提取到任何数据。请确认 ZIP 中包含正确的 1688 或震坤行 HTML 文件。');
       return;
     }
 
@@ -266,6 +277,9 @@
     if (output.failed > 0) summaryParts.push(`❌ ${output.failed} 个失败`);
     summaryParts.push(`📋 ${output.rows.length} 条数据记录`);
     resultSummary.textContent = summaryParts.join(' | ');
+
+    // 失败文件明细
+    renderFailedFiles(output.results);
 
     // 表格
     const headers = Object.keys(output.rows[0]);
@@ -308,9 +322,19 @@
             urls = val;
           }
           if (urls.length > 0) {
-            td.innerHTML = urls.map((url, i) =>
-              `<a href="${url}" target="_blank" title="${url}" class="img-link">图${i+1}</a>`
-            ).join(' ');
+            // 安全构建链接（防止 javascript: XSS）
+            const container = document.createDocumentFragment();
+            urls.forEach((url, i) => {
+              if (i > 0) container.appendChild(document.createTextNode(' '));
+              const a = document.createElement('a');
+              a.href = url;
+              a.target = '_blank';
+              a.title = url;
+              a.className = 'img-link';
+              a.textContent = '图' + (i + 1);
+              container.appendChild(a);
+            });
+            td.appendChild(container);
           } else {
             td.textContent = '-';
           }
@@ -325,6 +349,31 @@
         tr.appendChild(td);
       }
       resultTbody.appendChild(tr);
+    }
+  }
+
+  // ── 失败文件明细 ──
+
+  function renderFailedFiles(results) {
+    const failedFilesEl = document.getElementById('failedFiles');
+    const failedFilesList = document.getElementById('failedFilesList');
+    if (!failedFilesEl || !failedFilesList) return;
+
+    const failed = results.filter(r => r.status === 'failed');
+    if (failed.length === 0) {
+      hideElement(failedFilesEl);
+      return;
+    }
+
+    showElement(failedFilesEl);
+    failedFilesList.innerHTML = '';
+    for (const r of failed) {
+      const li = document.createElement('li');
+      const reason = r.platform === 'unknown'
+        ? '未识别的平台'
+        : '未提取到商品数据';
+      li.textContent = r.file + ' — ' + reason;
+      failedFilesList.appendChild(li);
     }
   }
 

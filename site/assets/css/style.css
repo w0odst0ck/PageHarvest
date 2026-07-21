@@ -672,6 +672,14 @@ pre { background: var(--surface-alt); border: 1px solid var(--border); border-ra
     background: var(--surface);
     color: var(--text);
   }
+
+  /* ── Dark mode failed files ── */
+  .failed-files h3 {
+    color: #fca5a5 !important;
+  }
+  .failed-files ul {
+    color: var(--text-secondary);
+  }
 }
 
 /* ── Download Section ── */
