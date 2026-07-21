@@ -27,7 +27,7 @@ const JDParser = (() => {
     if (/item\.jd\.com\/(\d+)/.test(html)) return true;
     if (/search\.jd\.com\/Search/.test(html)) return true;
 
-    // DOM 特征（独立于 URL）
+    // DOM 特征（含 jd.com 时快速通道）
     if (html.includes('jd.com') && (
       html.includes('sku-name') ||
       html.includes('summary-price') ||
@@ -42,26 +42,6 @@ const JDParser = (() => {
     if (html.includes('sku-name') && (html.includes('p-price') || html.includes('summary-price'))) return true;
     if (html.includes('parameter2 p-parameter-list') && html.includes('itemInfo-wrap')) return true;
 
-    return false;
-  }
-
-  function isDetailPage(html) {
-    // 详情页特征
-    if (/item\.jd\.com\/(\d+)/.test(html)) return true;
-    if (html.includes('.sku-name')) return true;
-    if (html.includes('summary-price') && html.includes('choose-attr-')) return true;
-    if (html.includes('parameter2 p-parameter-list') && html.includes('itemInfo-wrap')) return true;
-    // 新版 JD (React)
-    if (/class="?attrs[\s>]/.test(html) && /class="?top-name[\s>]/.test(html)) return true;
-    // 排除搜索页
-    if (/search\.jd\.com\/Search/.test(html)) return false;
-    if (html.includes('plugin_goodsCardWrapper')) return false;
-    return false;
-  }
-
-  function isSearchPage(html) {
-    if (/search\.jd\.com\/Search/.test(html)) return true;
-    if (html.includes('plugin_goodsCardWrapper') || html.includes('search-discover')) return true;
     return false;
   }
 
@@ -291,10 +271,12 @@ const JDParser = (() => {
   }
 
   function extractBrand(html, detail) {
-    // 参数表
-    const attrs = extractAttributes(html);
-    if (attrs['品牌']) return attrs['品牌'];
-    // 标题关键词
+    // 从 HTML 直接扫品牌属性（在 extractAttributes 调用之前执行）
+    const brandRe = /<li[^>]*>品牌[：:]\s*([^<]+)<\/li>/i;
+    let m = html.match(brandRe);
+    if (m) return m[1].trim();
+
+    // 标题关键词精准匹配
     const title = detail.title || '';
     const knownBrands = [
       '松下', 'Panasonic', '雷士', 'NVC', '欧普', 'OPPLE',
@@ -304,14 +286,17 @@ const JDParser = (() => {
     for (const brand of knownBrands) {
       if (title.includes(brand)) return brand;
     }
+
     return '';
   }
 
   function extractPrice(html) {
     let min = 0, max = 0;
 
-    // 新版: <div class=price><div class=value>79</div></div>
-    let m = html.match(/class="?price[^>"]*[\s>][\s\S]*?class="?value[^>"]*[\s>]([\d.]+)<\/div>/);
+    // 新版 JD 价格: <div class=price><div class=value>79</div></div>
+    // 兼容 quoted 和 unquoted 格式
+    let m = html.match(/<div[^>]*\bclass\s*=\s*"price"[^>]*>["'\s]*<div[^>]*\bclass\s*=\s*"value"[^>]*>([\d.]+)<\/div>/i);
+    if (!m) m = html.match(/<div[^>]*\bclass=price[\s>][\s\S]*?<div[^>]*\bclass=value[\s>]([\d.]+)<\/div>/i);
     if (m) {
       const v = parseFloat(m[1]);
       if (v > 0.01 && v < 100000) {
@@ -456,16 +441,16 @@ const JDParser = (() => {
   function extractAttributes(html) {
     const attrs = {};
 
-    // 旧版: .parameter2.p-parameter-list li
-    const oldRe = /<li[^>]*>([^<]*(?:品牌|型号|商品编号|材质|规格|尺寸|颜色|功率|电压|重量)[^<]*)<\/li>/gi;
+    // 旧版: .parameter2.p-parameter-list li — 匹配全部属性，不设关键词白名单
+    const oldRe = /<li[^>]*>([^<]{2,50}[：:]\s*[^<]{1,100})<\/li>/gi;
     let m;
     while ((m = oldRe.exec(html)) !== null) {
       const text = m[1].trim();
-      const parts = text.split(/[：:]/);
-      if (parts.length === 2) {
-        const key = parts[0].trim();
-        const val = parts[1].trim();
-        if (key && val && key.length < 20) attrs[key] = val;
+      const sepIdx = text.search(/[：:]/);
+      if (sepIdx > 0 && sepIdx < 20) {
+        const key = text.slice(0, sepIdx).trim();
+        const val = text.slice(sepIdx + 1).trim();
+        if (key && val && !attrs[key]) attrs[key] = val;
       }
     }
 
@@ -539,8 +524,6 @@ const JDParser = (() => {
 
   return {
     detect,
-    isDetailPage,
-    isSearchPage,
     parseDetail,
     parseSearch,
     toDetailRows,
