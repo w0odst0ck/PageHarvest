@@ -129,17 +129,18 @@
   <!-- Scripts -->
   <!-- JSZip — 解压 ZIP -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script>window.JSZip || document.write('<script src="assets/js/lib/jszip.min.js"><\/script>')</script>
+  <script>window.JSZip || document.head.appendChild(function(e){e.src='assets/js/lib/jszip.min.js';return e}(document.createElement('script')))</script>
 
   <!-- SheetJS — 生成 Excel -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script>window.XLSX || document.write('<script src="assets/js/lib/xlsx.full.min.js"><\/script>')</script>
+  <script>window.XLSX || document.head.appendChild(function(e){e.src='assets/js/lib/xlsx.full.min.js';return e}(document.createElement('script')))</script>
 
   <!-- 解析器 -->
   <script src="assets/js/parsers/alibaba.js"></script>
   <script src="assets/js/parsers/zkh.js"></script>
   <script src="assets/js/parser.js"></script>
   <script src="assets/js/app.js"></script>
+  <script src="assets/js/main.js"></script>
 
 </body>
 </html>

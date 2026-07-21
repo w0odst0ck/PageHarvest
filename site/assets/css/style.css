@@ -662,6 +662,16 @@ pre { background: var(--surface-alt); border: 1px solid var(--border); border-ra
   .result-table .img-link {
     color: var(--primary-light);
   }
+
+  /* ── Dark mode form elements ── */
+  .mode-selector select {
+    background: var(--surface);
+    color: var(--text);
+  }
+  .mode-selector select option {
+    background: var(--surface);
+    color: var(--text);
+  }
 }
 
 /* ── Download Section ── */
@@ -953,6 +963,15 @@ pre { background: var(--surface-alt); border: 1px solid var(--border); border-ra
   .guide-step .guide-script-table { font-size: 12px; }
   .guide-step .guide-script-table th,
   .guide-step .guide-script-table td { padding: 6px 8px; }
+
+  /* ── Tool section ── */
+  .tool-section { padding: 16px 0 40px; }
+  .page-header { padding: 32px 0 16px; }
+  .mode-selector { flex-direction: column; gap: 6px; }
+  .mode-selector select { width: 100%; }
+  .download-area { flex-wrap: wrap; }
+  .download-area .btn { flex: 1 1 calc(50% - 6px); text-align: center; justify-content: center; }
+  .result-table-wrapper { margin-bottom: 12px; }
 }
 
 @media (max-width: 480px) {
@@ -961,4 +980,24 @@ pre { background: var(--surface-alt); border: 1px solid var(--border); border-ra
   .feature-grid { grid-template-columns: 1fr; }
   .strategy-cards { grid-template-columns: 1fr; }
   .download-cards { grid-template-columns: 1fr; }
+
+  /* ── Drop zone ── */
+  .drop-zone { padding: 28px 16px; }
+  .drop-icon { font-size: 36px; margin-bottom: 8px; }
+  .drop-text { font-size: 16px; }
+
+  /* ── Result table ── */
+  .result-table td,
+  .result-table th { padding: 8px 10px; }
+  .result-table td { white-space: normal; word-break: break-word; }
+
+  /* ── Buttons ── */
+  .btn { font-size: 14px; padding: 10px 20px; }
+  .hero-cta .btn { padding: 12px 20px; }
+  .download-area .btn { flex: 1 1 100%; }
+
+  /* ── Guide page ── */
+  .guide-step .guide-script-table { font-size: 11px; }
+  .guide-step .guide-script-table th,
+  .guide-step .guide-script-table td { padding: 4px 6px; }
 }
