@@ -66,22 +66,25 @@ const JDParser = (() => {
       tags: [],
     };
 
+    // 预解析 DOM（9MB 页面只解析一次）
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+
     // ── 1. product_id ──
     detail.product_id = extractProductId(html);
 
     // ── 2. title ──
-    detail.title = extractTitle(html);
+    detail.title = extractTitle(html, doc);
 
     // ── 3. brand ──
     detail.brand = extractBrand(html, detail);
 
     // ── 4. price ──
-    const prices = extractPrice(html);
+    const prices = extractPrice(html, doc);
     detail.price_min = prices.min;
     detail.price_max = prices.max;
 
     // ── 5. shop ──
-    const shop = extractShop(html);
+    const shop = extractShop(html, doc);
     detail.shop_name = shop.name;
     detail.shop_type = shop.type;
 
@@ -243,7 +246,7 @@ const JDParser = (() => {
     return '';
   }
 
-  function extractTitle(html) {
+  function extractTitle(html, doc) {
     // pageConfig
     let m = html.match(/window\.pageConfig\s*=\s*({.*?"product"\s*:\s*{.*?});/);
     if (m) {
@@ -254,10 +257,8 @@ const JDParser = (() => {
         }
       } catch (e) { /* ignore */ }
     }
-    // .sku-name
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    const skuName = doc.querySelector('.sku-name');
+    // .sku-name（用预解析的 dom）
+    const skuName = doc && doc.querySelector('.sku-name');
     if (skuName) return skuName.textContent.trim();
     // <title> 标签
     m = html.match(/<title>([^<]+)<\/title>/);
@@ -290,99 +291,77 @@ const JDParser = (() => {
     return '';
   }
 
-  function extractPrice(html) {
-    let min = 0, max = 0;
-
-    // 新版 JD 价格: <div class=price><div class=value>79</div></div>
-    // 兼容 quoted 和 unquoted 格式
-    let m = html.match(/<div[^>]*\bclass\s*=\s*"price"[^>]*>["'\s]*<div[^>]*\bclass\s*=\s*"value"[^>]*>([\d.]+)<\/div>/i);
-    if (!m) m = html.match(/<div[^>]*\bclass=price[\s>][\s\S]*?<div[^>]*\bclass=value[\s>]([\d.]+)<\/div>/i);
-    if (m) {
+  function extractPrice(html, doc) {
+    // 新版 JD 价格区域: class=price>...class=value>69.41
+    // 循环收集全部价格（多 SKU 页面取 min/max）
+    const allPrices = [];
+    const priceRe = /<div[^>]*\bclass=price[\s>][\s\S]*?<div[^>]*\bclass=value[\s>]([\d.]+)<\/div>/gi;
+    let m;
+    while ((m = priceRe.exec(html)) !== null) {
       const v = parseFloat(m[1]);
-      if (v > 0.01 && v < 100000) {
-        min = v;
-        return { min, max };
-      }
+      if (v > 0.01 && v < 100000) allPrices.push(v);
     }
-
-    // jdPrice JSON
+    if (allPrices.length > 0) {
+      return { min: Math.min(...allPrices), max: Math.max(...allPrices) };
+    }
+    // jdPrice JSON（旧版页面兜底）
     m = html.match(/"jdPrice"\s*:\s*"([\d.]+)"/);
     if (m) {
-      min = parseFloat(m[1]);
-      return { min, max };
+      return { min: parseFloat(m[1]), max: 0 };
     }
-
-    // DOM 价格选择器
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    for (const sel of ['.summary-price .price', '.p-price .price', '.summary-wrap .p-price',
-                       '.p-price', '[class*="price"]']) {
-      const el = doc.querySelector(sel);
-      if (el) {
-        const text = el.textContent.trim();
-        const prices = text.match(/[\d.]+/g);
-        if (prices) {
-          const floats = prices.map(parseFloat).filter(v => v > 0.01 && v < 100000);
-          if (floats.length > 0) {
-            min = Math.min(...floats);
-            max = Math.max(...floats);
-            return { min, max };
+    // DOM 价格选择器（用预解析的 dom）
+    if (doc) {
+      for (const sel of ['.summary-price .price', '.p-price .price', '.summary-wrap .p-price',
+                         '.p-price', '[class*="price"]']) {
+        const el = doc.querySelector(sel);
+        if (el) {
+          const text = el.textContent.trim();
+          const nums = text.match(/[\d.]+/g);
+          if (nums) {
+            const floats = nums.map(parseFloat).filter(v => v > 0.01 && v < 100000);
+            if (floats.length > 0) {
+              return { min: Math.min(...floats), max: Math.max(...floats) };
+            }
           }
         }
       }
     }
-
-    // 正则全文兜底
-    const allPrices = html.match(/¥?(\d+\.\d{2})/g);
-    if (allPrices) {
-      const floats = allPrices.map(s => parseFloat(s.replace('¥', '')))
+    // 全文兜底：任意 ¥ 开头的价格
+    const allYuan = html.match(/[\u00a5\uffe5]([\d.]+)/g);
+    if (allYuan) {
+      const floats = allYuan.map(s => parseFloat(s.replace(/[\u00a5\uffe5]/, '')))
         .filter(v => v > 0.1 && v < 100000);
       if (floats.length > 0) {
-        min = Math.min(...floats);
-        max = Math.max(...floats);
+        return { min: Math.min(...floats), max: Math.max(...floats) };
       }
     }
-
-    return { min, max };
+    return { min: 0, max: 0 };
   }
 
-  function extractShop(html) {
+  function extractShop(html, doc) {
     let name = '';
     let type = '';
-
-    // 新版: class="top-name"
-    let m = html.match(/class="?top-name[^>"]*[\s>][^>]*title="?([^">]*)"?/);
+    // 新版: class=top-name（unquoted 和 quoted 均可）
+    let m = html.match(/class="?top-name[^>]*["\s>][^>]*title="?([^">]*)"?/);
     if (m) name = m[1].trim();
-
-    // 旧版: .J-hove-wrap .name a
-    if (!name) {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
+    // 旧版: .J-hove-wrap .name a（用预解析的 dom）
+    if (!name && doc) {
       for (const sel of ['.J-hove-wrap .name a', '.shop .name a', '.shop-name a',
                          '.J-shop-name', '[class*="shop-name"]']) {
         const el = doc.querySelector(sel);
-        if (el) {
-          const t = el.textContent.trim();
-          if (t && t.length > 1) {
-            name = t;
-            break;
-          }
-        }
+        if (el) { name = el.textContent.trim(); if (name && name.length > 1) break; }
       }
     }
-
     // 兜底: waist-shop-title
     if (!name) {
       m = html.match(/waist-shop-title[\s\S]*?class="?shop-name[^>"]*"?[^>]*>([^<]+)/);
       if (m) name = m[1].trim();
     }
-
     if (html.includes('自营')) type = '自营';
     else if (name.includes('旗舰店')) type = '旗舰店';
     else if (name.includes('专卖店')) type = '专卖店';
     else if (name.includes('专营店')) type = '专营店';
     else type = '第三方';
-
     return { name, type };
   }
 
@@ -482,11 +461,15 @@ const JDParser = (() => {
   }
 
   function extractSales(html) {
-    let m = html.match(/累计评价[^\d]*([\d.万+]+)/);
+    // 新 JD: <div class=text>累计评价</div></div><div class=value>50万+</div>
+    let m = html.match(/<div class=text>累计评价<\/div><\/div><div class=value>([^<]+)<\/div>/);
+    if (m) return m[1].trim();
+    // 旧 JD 文本
+    m = html.match(/累计评价[^\d]*([\d.万+]+)/);
     if (m) return m[1];
     m = html.match(/买家评价\((\d+万?\+?)\)/);
     if (m) return m[1];
-    // DOM
+    // 旧 JD DOM 选择器
     const selRe = /class="[^"]*(?:J-sale-data|sale-data|comment-count|sales-volume)[^"]*"[^>]*>([^<]+)/;
     m = html.match(selRe);
     if (m) {
