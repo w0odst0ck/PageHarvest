@@ -23,16 +23,26 @@ const JDParser = (() => {
    * 是否为京东页面（详情页或搜索页）
    */
   function detect(html) {
-    return /item\.jd\.com\/(\d+)/.test(html) ||
-           /search\.jd\.com\/Search/.test(html) ||
-           html.includes('jd.com') && (
-             html.includes('.sku-name') ||
-             html.includes('summary-price') ||
-             html.includes('pageConfig') ||
-             html.includes('parameter2 p-parameter-list') ||
-             html.includes('choose-attr-') ||
-             html.includes('goods-item-wrap-new')
-           );
+    // URL 模式
+    if (/item\.jd\.com\/(\d+)/.test(html)) return true;
+    if (/search\.jd\.com\/Search/.test(html)) return true;
+
+    // DOM 特征（独立于 URL）
+    if (html.includes('jd.com') && (
+      html.includes('sku-name') ||
+      html.includes('summary-price') ||
+      html.includes('pageConfig') ||
+      html.includes('parameter2 p-parameter-list') ||
+      html.includes('choose-attr-') ||
+      html.includes('goods-item-wrap-new')
+    )) return true;
+
+    // 无 jd.com 时的兜底检测（离线保存的页面可能无源 URL）
+    if (html.includes('pageConfig') && html.includes('"sku"') && html.includes('"product"')) return true;
+    if (html.includes('sku-name') && (html.includes('p-price') || html.includes('summary-price'))) return true;
+    if (html.includes('parameter2 p-parameter-list') && html.includes('itemInfo-wrap')) return true;
+
+    return false;
   }
 
   function isDetailPage(html) {
