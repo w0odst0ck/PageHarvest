@@ -43,6 +43,10 @@
   let allRows = [];             // 累计行（追加模式）
   let allResults = [];          // 累计原始结果
   let appendMode = false;       // 当前是否是追加模式
+  let parsing = false;          // 解析中锁，防止并发
+  let prevFileCount = 0;        // 上次解析的文件数（用于追加模式摘要）
+  let prevSuccessCount = 0;
+  let prevFailedCount = 0;
   let chartPriceInstance = null;  // Chart.js 实例（复用）
   let chartBrandInstance = null;
 
@@ -174,12 +178,17 @@
   // ── 开始解析 ──
 
   async function startParsing() {
+    if (parsing) return;  // 防止并发
+
     if (!currentFile) {
       showError('请先选择一个 ZIP 文件');
       return;
     }
 
     const mode = modeSelect ? modeSelect.value : 'search';
+
+    // 锁定
+    parsing = true;
 
     // 重置 UI
     hideError();
@@ -246,12 +255,18 @@
         allResults = [...allResults, ...(output.results || [])];
         output.rows = allRows;
         output.results = allResults;
+        output.totalFiles = (output.totalFiles || output.total) + (prevFileCount || 0);
+        output.successFiles = (output.successFiles || output.success) + (prevSuccessCount || 0);
+        output.failedFiles = (output.failedFiles || output.failed) + (prevFailedCount || 0);
         currentOutput = output;
         appendMode = false;
         if (appendInput) appendInput.value = '';
       } else {
         allRows = output.rows || [];
         allResults = output.results || [];
+        prevFileCount = output.total;
+        prevSuccessCount = output.success;
+        prevFailedCount = output.failed;
       }
 
       // 检查解析结果
@@ -292,6 +307,7 @@
       hideElement(progressArea);
     } finally {
       parseBtn.disabled = false;
+      parsing = false;
     }
   }
 
@@ -310,11 +326,14 @@
       return;
     }
 
-    // 摘要
+    // 摘要（追加模式：显示累计总量）
+    const fileCount = output.totalFiles || output.total;
+    const successCount = output.successFiles || output.success;
+    const failedCount = output.failedFiles || output.failed;
     const summaryParts = [];
-    summaryParts.push(`📊 共解析 ${output.total} 个文件`);
-    summaryParts.push(`✅ ${output.success} 个成功`);
-    if (output.failed > 0) summaryParts.push(`❌ ${output.failed} 个失败`);
+    summaryParts.push(`📊 共解析 ${fileCount} 个文件`);
+    summaryParts.push(`✅ ${successCount} 个成功`);
+    if (failedCount > 0) summaryParts.push(`❌ ${failedCount} 个失败`);
     summaryParts.push(`📋 ${output.rows.length} 条数据记录`);
     resultSummary.textContent = summaryParts.join(' | ');
 
