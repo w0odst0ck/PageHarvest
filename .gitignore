@@ -67,3 +67,11 @@ src/cli/__pycache__/
 
 # 运行日志
 ph_debug.log
+
+# 本地测试工具（不提交）
+node_modules/
+/package.json
+/package-lock.json
+/test_jd.js
+/test_jd_browser.html
+site/assets/test/*_real.*
