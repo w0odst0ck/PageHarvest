@@ -29,12 +29,17 @@
   const downloadXlsxBtn = document.getElementById('downloadXlsxBtn');
   const downloadTxtBtn = document.getElementById('downloadTxtBtn');
   const downloadJsonBtn = document.getElementById('downloadJsonBtn');
+  const chartsSection = document.getElementById('chartsSection');
+  const chartPrice = document.getElementById('chartPrice');
+  const chartBrand = document.getElementById('chartBrand');
   const errorArea = document.getElementById('errorArea');
   const errorText = document.getElementById('errorText');
 
   // ── 状态 ──
   let currentFile = null;       // 当前选择的 ZIP File
   let currentOutput = null;     // 最近一次解析输出
+  let chartPriceInstance = null;  // Chart.js 实例（复用）
+  let chartBrandInstance = null;
 
   // ── 初始化 ──
   function init() {
@@ -140,6 +145,9 @@
     dropZone.classList.remove('file-selected');
     void dropZone.offsetWidth; // 强制重排触发动画重播
     dropZone.classList.add('file-selected');
+
+    // 重置图表
+    hideChartCharts();
 
     hideError();
     hideElement(resultsArea);
@@ -299,6 +307,9 @@
 
     // 显示结果区
     showElement(resultsArea);
+
+    // 渲染图表
+    renderCharts(output.rows);
   }
 
   function renderTable(headers, rows) {
@@ -391,6 +402,91 @@
 
   // ── 下载按钮 ──
 
+  // ── 图表渲染 ──
+
+  function renderCharts(rows) {
+    if (!chartsSection || !chartPrice || !chartBrand) return;
+    if (!window.Chart || !rows || rows.length === 0) {
+      hideElement(chartsSection);
+      return;
+    }
+
+    showElement(chartsSection);
+
+    // ── 价格分布 ──
+    const prices = rows
+      .map(r => { const p = parseFloat(r['最低价'] || r['价格'] || r['price'] || r['price_min']); return isNaN(p) ? null : p; })
+      .filter(p => p !== null && p > 0);
+
+    if (chartPriceInstance) chartPriceInstance.destroy();
+    if (prices.length > 0) {
+      const maxPrice = Math.max(...prices);
+      const step = maxPrice <= 20 ? 5 : maxPrice <= 100 ? 10 : maxPrice <= 500 ? 50 : maxPrice <= 2000 ? 200 : 500;
+      const bins = {};
+      for (let p of prices) {
+        const bin = Math.floor(p / step) * step;
+        const key = `${bin}-${bin + step}`;
+        bins[key] = (bins[key] || 0) + 1;
+      }
+      const labels = Object.keys(bins);
+      const data = Object.values(bins);
+      chartPriceInstance = new Chart(chartPrice, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: '商品数',
+            data,
+            backgroundColor: 'rgba(37, 99, 235, .5)',
+            borderColor: '#2563eb',
+            borderWidth: 1,
+            borderRadius: 3,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: true,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+        }
+      });
+    }
+
+    // ── 品牌/平台分布 ──
+    const brands = rows
+      .map(r => r['品牌'] || r['店铺'] || r['shop_name'] || r['brand'] || '未知')
+      .filter(Boolean);
+
+    if (chartBrandInstance) chartBrandInstance.destroy();
+    if (brands.length > 0) {
+      const freq = {};
+      for (const b of brands) freq[b] = (freq[b] || 0) + 1;
+
+      // 只取 Top 8 品牌 + 其他
+      let entries = Object.entries(freq).sort((a, b) => b[1] - a[1]);
+      const others = entries.slice(8);
+      const top = entries.slice(0, 8);
+      if (others.length > 0) top.push(['其他', others.reduce((s, [,v]) => s + v, 0)]);
+
+      chartBrandInstance = new Chart(chartBrand, {
+        type: 'doughnut',
+        data: {
+          labels: top.map(([k]) => k),
+          datasets: [{
+            data: top.map(([,v]) => v),
+            backgroundColor: ['#2563eb','#16a34a','#d97706','#dc2626','#8b5cf6','#ec4899','#06b6d4','#84cc16','#9ca3af'],
+            borderWidth: 2,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: true,
+          plugins: {
+            legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 8, boxWidth: 12 } }
+          }
+        }
+      });
+    }
+  }
+
   function setupDownloadButtons() {
     if (downloadCsvBtn) downloadCsvBtn.addEventListener('click', () => download('csv'));
     if (downloadXlsxBtn) downloadXlsxBtn.addEventListener('click', () => download('xlsx'));
@@ -467,10 +563,17 @@
 
   // ── 错误显示 ──
 
+  function hideChartCharts() {
+    hideElement(chartsSection);
+    if (chartPriceInstance) { chartPriceInstance.destroy(); chartPriceInstance = null; }
+    if (chartBrandInstance) { chartBrandInstance.destroy(); chartBrandInstance = null; }
+  }
+
   function showError(msg) {
     if (errorText) errorText.textContent = msg;
     showElement(errorArea);
     hideElement(resultsArea);
+    hideChartCharts();
     hideElement(progressArea);
     parseBtn.disabled = false;
     updateParseButton();

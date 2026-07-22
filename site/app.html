@@ -7,6 +7,7 @@
   <meta name="description" content="拖拽上传电商平台 HTML 截图 ZIP，自动解析商品数据，在线下载报告。数据不离开浏览器。">
   <link rel="stylesheet" href="assets/css/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><text y='16' fill='%231a56db'>✦</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
 </head>
 <body>
 
@@ -99,6 +100,21 @@
           <button class="btn btn-secondary" id="downloadXlsxBtn">↓ 下载 Excel</button>
           <button class="btn btn-secondary" id="downloadTxtBtn">↓ 报告 (TXT)</button>
           <button class="btn btn-secondary" id="downloadJsonBtn">↓ JSON</button>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="charts-section" id="chartsSection" hidden>
+        <h2>数据概览</h2>
+        <div class="charts-grid">
+          <div class="chart-box">
+            <h3>📈 价格分布</h3>
+            <canvas id="chartPrice"></canvas>
+          </div>
+          <div class="chart-box">
+            <h3>🧩 品牌 / 平台分布</h3>
+            <canvas id="chartBrand"></canvas>
+          </div>
         </div>
       </div>
 

@@ -578,6 +578,44 @@ pre { background: var(--surface-alt); border: 1px solid var(--border); border-ra
   border-radius: var(--radius-sm);
 }
 
+.charts-section {
+  margin-top: 24px;
+}
+
+.charts-section h2 {
+  font-size: 18px;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.chart-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.chart-box h3 {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.chart-box canvas {
+  max-height: 260px;
+}
+
+@media (max-width: 640px) {
+  .charts-grid { grid-template-columns: 1fr; }
+}
+
 .result-table {
   width: 100%;
   border-collapse: collapse;
