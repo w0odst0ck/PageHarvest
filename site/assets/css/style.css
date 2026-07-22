@@ -450,6 +450,16 @@ pre { background: var(--surface-alt); border: 1px solid var(--border); border-ra
   background: rgba(26,86,219,.04);
 }
 
+.drop-zone.file-selected {
+  animation: dropSelected .4s ease;
+}
+
+@keyframes dropSelected {
+  0%   { border-color: var(--primary); transform: scale(1); }
+  50%  { border-color: #22c55e; transform: scale(1.02); background: rgba(34,197,94,.06); }
+  100% { border-color: var(--primary); transform: scale(1); }
+}
+
 .drop-zone-content {
   pointer-events: none;
 }

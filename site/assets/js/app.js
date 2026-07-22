@@ -136,6 +136,11 @@
     if (dropText) dropText.textContent = `📦 ${file.name}`;
     if (dropHint) dropHint.textContent = `(${(file.size / 1024).toFixed(1)} KB) 点击重新选择`;
 
+    // 选中反馈：拖拽区闪烁提示
+    dropZone.classList.remove('file-selected');
+    void dropZone.offsetWidth; // 强制重排触发动画重播
+    dropZone.classList.add('file-selected');
+
     hideError();
     hideElement(resultsArea);
   }
@@ -198,8 +203,15 @@
       setProgress(20, '正在检测页面平台...');
       const scan = await PageHarvestParser.quickScan(currentFile);
 
+      // 防御：quickScan 异常返回
+      if (!scan) {
+        showError('扫描 ZIP 文件失败，文件格式可能不正确，请确认后重试');
+        return;
+      }
+
       if (scan.totalHtml === 0) {
-        showError('ZIP 中没有找到 HTML 文件，该压缩包包含 ' + scan.totalFiles + ' 个文件，但没有 .html 网页文件。请确认压缩包内包含网页截图');
+        const fileCount = scan.totalFiles != null ? scan.totalFiles + ' 个文件，但' : '';
+        showError('ZIP 中没有找到 HTML 文件' + (fileCount ? '，该压缩包包含 ' + fileCount : '') + '没有 .html 网页文件。请确认压缩包内包含网页截图');
         return;
       }
 
@@ -216,7 +228,7 @@
 
       // 检查解析结果
       if (output.total === 0) {
-        showError('ZIP 中没有找到 HTML 文件，请确认压缩包内包含网页截图');
+        showError('未能提取到商品数据，ZIP 中可能不包含支持的页面内容，请确认后重试');
         return;
       }
 
