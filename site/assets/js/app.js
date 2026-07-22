@@ -29,6 +29,8 @@
   const downloadXlsxBtn = document.getElementById('downloadXlsxBtn');
   const downloadTxtBtn = document.getElementById('downloadTxtBtn');
   const downloadJsonBtn = document.getElementById('downloadJsonBtn');
+  const appendBtn = document.getElementById('appendBtn');
+  const appendInput = document.getElementById('appendInput');
   const chartsSection = document.getElementById('chartsSection');
   const chartPrice = document.getElementById('chartPrice');
   const chartBrand = document.getElementById('chartBrand');
@@ -38,6 +40,9 @@
   // ── 状态 ──
   let currentFile = null;       // 当前选择的 ZIP File
   let currentOutput = null;     // 最近一次解析输出
+  let allRows = [];             // 累计行（追加模式）
+  let allResults = [];          // 累计原始结果
+  let appendMode = false;       // 当前是否是追加模式
   let chartPriceInstance = null;  // Chart.js 实例（复用）
   let chartBrandInstance = null;
 
@@ -46,6 +51,7 @@
     setupDragDrop();
     setupFileInput();
     setupParseButton();
+    setupAppendButton();
     setupDownloadButtons();
 
     // 初始状态
