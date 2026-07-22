@@ -234,6 +234,20 @@
       const output = await PageHarvestParser.parseZip(currentFile, mode);
       currentOutput = output;
 
+      // 追加模式：合并到累计数据
+      if (appendMode) {
+        allRows = [...allRows, ...(output.rows || [])];
+        allResults = [...allResults, ...(output.results || [])];
+        output.rows = allRows;
+        output.results = allResults;
+        currentOutput = output;
+        appendMode = false;
+        if (appendInput) appendInput.value = '';
+      } else {
+        allRows = output.rows || [];
+        allResults = output.results || [];
+      }
+
       // 检查解析结果
       if (output.total === 0) {
         showError('未能提取到商品数据，ZIP 中可能不包含支持的页面内容，请确认后重试');
@@ -305,8 +319,9 @@
     const headers = Object.keys(output.rows[0]);
     renderTable(headers, output.rows);
 
-    // 显示结果区
+    // 显示结果区 + 追加按钮
     showElement(resultsArea);
+    showAppendButton();
 
     // 渲染图表
     renderCharts(output.rows);
@@ -563,8 +578,46 @@
 
   // ── 错误显示 ──
 
+  // ── 追加模式 ──
+
+  function setupAppendButton() {
+    if (!appendBtn || !appendInput) return;
+
+    appendBtn.addEventListener('click', () => {
+      appendInput.click();
+    });
+
+    appendInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        const file = e.target.files[0];
+        if (!file.name.endsWith('.zip') && !file.name.endsWith('.ZIP')) {
+          showError('请选择 ZIP 格式的文件');
+          return;
+        }
+        if (file.size > 100 * 1024 * 1024) {
+          showError('文件过大（超过 100MB），建议不超过 50MB');
+          return;
+        }
+        currentFile = file;
+        appendMode = true;
+        startParsing();
+      }
+    });
+  }
+
+  function showAppendButton() {
+    if (!appendBtn) return;
+    showElement(appendBtn);
+  }
+
+  function hideAppendButton() {
+    if (!appendBtn) return;
+    hideElement(appendBtn);
+  }
+
   function hideChartCharts() {
     hideElement(chartsSection);
+    hideAppendButton();
     if (chartPriceInstance) { chartPriceInstance.destroy(); chartPriceInstance = null; }
     if (chartBrandInstance) { chartBrandInstance.destroy(); chartBrandInstance = null; }
   }
