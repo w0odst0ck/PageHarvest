@@ -483,11 +483,15 @@ const AlibabaParser = (() => {
       const price = parseFloat(row['价格']) || 0;
       return {
         title: (row['标题'] || '').trim(),
+        price: price,
+        price_range: price > 0 ? String(price) : '',
         price_min: price,
         price_max: price,
         link: row['商品链接'] || '',
+        images: row['主图链接'] ? [row['主图链接']] : [],
         image: row['主图链接'] || '',
         sales: String(row['年销售件数'] || row['年销售笔数'] || ''),
+        shop_name: row['店铺名'] || '',
         shop: row['店铺名'] || '',
         product_id: String(row['商品ID'] || ''),
         category: row['类目'] || '',
