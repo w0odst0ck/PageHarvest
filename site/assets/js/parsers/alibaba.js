@@ -472,6 +472,29 @@ const AlibabaParser = (() => {
 
   // ── 公共 API ──
 
+  /**
+   * 解析 1688采购助手导出的 xlsx 数据
+   * 直接读取 SheetJS 转换后的 JSON，映射为标准搜索页格式
+   */
+  function parseXLSX(rows) {
+    if (!rows || !Array.isArray(rows) || rows.length === 0) return [];
+
+    return rows.map(row => {
+      const price = parseFloat(row['价格']) || 0;
+      return {
+        title: (row['标题'] || '').trim(),
+        price_min: price,
+        price_max: price,
+        link: row['商品链接'] || '',
+        image: row['主图链接'] || '',
+        sales: String(row['年销售件数'] || row['年销售笔数'] || ''),
+        shop: row['店铺名'] || '',
+        product_id: String(row['商品ID'] || ''),
+        category: row['类目'] || '',
+      };
+    }).filter(p => p.title);
+  }
+
   return {
     detect,
     detectPageType,
@@ -479,6 +502,7 @@ const AlibabaParser = (() => {
     isDetailPage,
     parseSearch,
     parseDetail,
+    parseXLSX,
     toSearchRows,
     toDetailRows,
   };

@@ -501,12 +501,36 @@ const JDParser = (() => {
     return tags;
   }
 
+  /**
+   * 判断页面类型：搜索页 / 详情页
+   */
+  function detectPageType(html) {
+    // 搜索页特征优先检查（搜索页 HTML 中也包含 item.jd.com/ 的商品链接）
+    if (html.includes('search.jd.com/Search') ||
+        html.includes('gl-item') ||
+        html.includes('goods-item-wrap-new') ||
+        html.includes('search_result_item')) {
+      return 'search';
+    }
+    // 详情页特征
+    if (html.includes('sku-name') ||
+        html.includes('summary-price') ||
+        html.includes('parameter2 p-parameter-list') ||
+        html.includes('choose-attr-') ||
+        html.includes('pageConfig') ||
+        html.includes('itemInfo-wrap')) {
+      return 'detail';
+    }
+    return 'unknown';
+  }
+
   // ══════════════════════════════════════════════════════════
   //  公共 API
   // ══════════════════════════════════════════════════════════
 
   return {
     detect,
+    detectPageType,
     parseDetail,
     parseSearch,
     toDetailRows,

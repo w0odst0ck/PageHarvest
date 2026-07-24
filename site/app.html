@@ -53,9 +53,9 @@
       <div class="drop-zone" id="dropZone">
         <div class="drop-zone-content">
           <div class="drop-icon">📁</div>
-          <p class="drop-text">拖拽 ZIP 文件到此处</p>
+          <p class="drop-text">拖拽 ZIP 或 XLSX 文件到此处</p>
           <p class="drop-hint">或点击选择文件</p>
-          <input type="file" id="fileInput" accept=".zip" hidden>
+          <input type="file" id="fileInput" accept=".zip,.xlsx" hidden>
         </div>
       </div>
 
@@ -102,7 +102,7 @@
           <button class="btn btn-secondary" id="downloadJsonBtn">↓ JSON</button>
           <button class="btn btn-outline" id="appendBtn" hidden>➕ 追加解析</button>
         </div>
-        <input type="file" id="appendInput" accept=".zip" hidden>
+        <input type="file" id="appendInput" accept=".zip,.xlsx" hidden>
       </div>
 
       <!-- Charts -->

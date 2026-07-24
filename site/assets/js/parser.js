@@ -35,7 +35,7 @@ const PageHarvestParser = (() => {
     let firstHtml = null;
     let totalHtml = 0;
     zip.forEach((relativePath, entry) => {
-      if (!entry.dir && /\.html?$/i.test(relativePath)) {
+      if (!entry.dir && /\.(html?|mhtml?)$/i.test(relativePath)) {
         totalHtml++;
         if (!firstHtml) firstHtml = { path: relativePath, entry };
       }
@@ -66,16 +66,20 @@ const PageHarvestParser = (() => {
     // 1. 读 ZIP
     const zip = await JSZip.loadAsync(zipFile);
 
-    // 2. 筛选 HTML 文件
+    // 2. 筛选 HTML 和 XLSX 文件
     const htmlFiles = [];
+    const xlsxFiles = [];
     zip.forEach((relativePath, entry) => {
-      if (!entry.dir && /\.html?$/i.test(relativePath)) {
+      if (entry.dir) return;
+      if (/\.(html?|mhtml?)$/i.test(relativePath)) {
         htmlFiles.push({ path: relativePath, entry });
+      } else if (/\.xlsx?$/i.test(relativePath)) {
+        xlsxFiles.push({ path: relativePath, entry });
       }
     });
 
-    if (htmlFiles.length === 0) {
-      throw new Error('ZIP 中未找到 HTML 文件');
+    if (htmlFiles.length === 0 && xlsxFiles.length === 0) {
+      throw new Error('ZIP 中未找到 HTML 或 XLSX 文件');
     }
 
     // 3. 解析每个 HTML
@@ -84,29 +88,38 @@ const PageHarvestParser = (() => {
       const content = await entry.async('string');
       const platform = detectPlatform(content);
 
+      // 自动检测页面类型，优先级：自动 > 用户选择
+      let detectedType = 'unknown';
+      if (platform === 'alibaba') detectedType = AlibabaParser.detectPageType(content);
+      else if (platform === 'zkh') detectedType = ZKHParser.detectPageType(content);
+      else if (platform === 'jingdong') detectedType = JDParser.detectPageType(content);
+
+      // 自动检测到类型时覆盖用户选择，否则回退到用户模式
+      const actualMode = (detectedType !== 'unknown') ? detectedType : mode;
+
       let parsedData = null;
       if (platform === 'alibaba') {
-        if (mode === 'search') {
+        if (actualMode === 'search') {
           parsedData = AlibabaParser.parseSearch(content);
-        } else if (mode === 'detail') {
+        } else if (actualMode === 'detail') {
           const detail = AlibabaParser.parseDetail(content);
           if (detail && detail.title) {
             parsedData = detail;
           }
         }
       } else if (platform === 'zkh') {
-        if (mode === 'search') {
+        if (actualMode === 'search') {
           parsedData = ZKHParser.parseSearch(content);
-        } else if (mode === 'detail') {
+        } else if (actualMode === 'detail') {
           const detail = ZKHParser.parseDetail(content);
           if (detail && detail.title) {
             parsedData = detail;
           }
         }
       } else if (platform === 'jingdong') {
-        if (mode === 'search') {
+        if (actualMode === 'search') {
           parsedData = JDParser.parseSearch(content);
-        } else if (mode === 'detail') {
+        } else if (actualMode === 'detail') {
           const detail = JDParser.parseDetail(content);
           if (detail && detail.title) {
             parsedData = detail;
@@ -120,6 +133,30 @@ const PageHarvestParser = (() => {
         status: parsedData ? 'success' : 'failed',
         data: parsedData,
       });
+    }
+
+    // 3.5 解析 XLSX 文件（1688采购助手导出数据）
+    for (const { path, entry } of xlsxFiles) {
+      try {
+        const data = await entry.async('arraybuffer');
+        const wb = XLSX.read(data, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws);
+        const products = AlibabaParser.parseXLSX(rows);
+        results.push({
+          file: path,
+          platform: 'alibaba',
+          status: products.length > 0 ? 'success' : 'failed',
+          data: products,
+        });
+      } catch (e) {
+        results.push({
+          file: path,
+          platform: 'alibaba',
+          status: 'failed',
+          data: null,
+        });
+      }
     }
 
     // 4. 生成输出
@@ -310,6 +347,38 @@ const PageHarvestParser = (() => {
 
   // ── 工具函数 ──
 
+  /**
+   * 统一文件入口：ZIP 或单文件 XLSX
+   */
+  async function parseFile(file, mode) {
+    if (file && file.name && /\.xlsx?$/i.test(file.name)) {
+      // 单文件 xlsx 上传
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws);
+      const products = AlibabaParser.parseXLSX(rows);
+      const results = [{
+        file: file.name,
+        platform: 'alibaba',
+        status: products.length > 0 ? 'success' : 'failed',
+        data: products,
+      }];
+      return {
+        results,
+        platform: 'alibaba',
+        total: 1,
+        success: products.length > 0 ? 1 : 0,
+        failed: products.length > 0 ? 0 : 1,
+        rows: products,
+        csv: generateCSV(products),
+        json: JSON.stringify(results, null, 2),
+        txt: generateSearchTXT(results),
+      };
+    }
+    return parseZip(file, mode);
+  }
+
   function getFilename(mode) {
     const now = new Date();
     const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
@@ -322,6 +391,7 @@ const PageHarvestParser = (() => {
     detectPlatform,
     quickScan,
     parseZip,
+    parseFile,
     generateCSV,
     generateJSON,
     generateXLSX,

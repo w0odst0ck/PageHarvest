@@ -105,8 +105,8 @@
       const files = e.dataTransfer.files;
       if (files.length > 0) {
         const file = files[0];
-        if (!file.name.endsWith('.zip')) {
-          showError('请拖拽 ZIP 格式的文件，当前文件类型不是 ZIP');
+        if (!file.name.endsWith('.zip') && !file.name.endsWith('.xlsx') && !file.name.endsWith('.XLSX')) {
+          showError('请拖拽 ZIP 或 XLSX 格式的文件，当前文件类型不支持');
           return;
         }
         if (file.size > 100 * 1024 * 1024) {
@@ -133,8 +133,8 @@
   function handleFileSelect(file) {
     // 文件校验
     if (!file) return;
-    if (!file.name.endsWith('.zip') && !file.name.endsWith('.ZIP')) {
-      showError('请选择 ZIP 格式的文件，选中的文件不是 ZIP 压缩包');
+    if (!file.name.endsWith('.zip') && !file.name.endsWith('.ZIP') && !file.name.endsWith('.xlsx') && !file.name.endsWith('.XLSX')) {
+      showError('请选择 ZIP 或 XLSX 格式的文件');
       return;
     }
     if (file.size > 100 * 1024 * 1024) {
@@ -181,7 +181,7 @@
     if (parsing) return;  // 防止并发
 
     if (!currentFile) {
-      showError('请先选择一个 ZIP 文件');
+      showError('请先选择一个 ZIP 或 XLSX 文件');
       return;
     }
 
@@ -222,7 +222,33 @@
 
       setProgress(15, '正在解压 ZIP 文件...');
 
-      // 快速扫描：提前检测平台和文件数量
+      // XLSX 文件直接解析，跳过扫描
+      if (currentFile.name && /\.xlsx?$/i.test(currentFile.name)) {
+        setProgress(25, '检测到 XLSX 文件，开始解析...');
+        const output = await PageHarvestParser.parseFile(currentFile, mode);
+        currentOutput = output;
+
+        if (output.total === 0) {
+          showError('未能提取到商品数据，请确认 XLSX 文件格式正确（1688采购助手导出格式）');
+          return;
+        }
+
+        if (!output.rows || output.rows.length === 0) {
+          showError('未能提取到商品数据，XLSX 中未识别到有效商品信息');
+          return;
+        }
+
+        setProgress(80, '解析完成: ' + output.success + '/' + output.total + ' 成功');
+        renderResults(output, mode);
+        setProgress(100, '解析完成 ✓');
+        await sleep(500);
+        hideElement(progressArea);
+        parseBtn.disabled = false;
+        parsing = false;
+        return;
+      }
+
+      // ZIP 扫描
       setProgress(20, '正在检测页面平台...');
       const scan = await PageHarvestParser.quickScan(currentFile);
 
@@ -246,7 +272,7 @@
       setProgress(25, '检测到 ' + scan.totalHtml + ' 个 HTML 文件，平台: ' + (scan.platform === 'alibaba' ? '1688' : (scan.platform === 'zkh' ? '震坤行' : '京东')) + '，开始解析...');
 
       // 执行解析
-      const output = await PageHarvestParser.parseZip(currentFile, mode);
+      const output = await PageHarvestParser.parseFile(currentFile, mode);
       currentOutput = output;
 
       // 追加模式：合并到累计数据
@@ -283,7 +309,17 @@
 
       // 检查数据是否为空
       if (!output.rows || output.rows.length === 0) {
-        showError('未能提取到商品数据，请确认 HTML 内容完整包含商品信息');
+        // 尝试给出更具体的原因
+        const hasDetectFailures = output.results && output.results.some(r => r.platform === 'unknown');
+        const hasParseFailures = output.results && output.results.some(r => r.status === 'failed');
+        
+        let detail = '请确认 HTML 内容完整包含商品信息';
+        if (hasDetectFailures) {
+          detail = '部分文件未能识别平台，目前支持 1688、震坤行和京东。如果文件是 .mhtml 格式，请重新保存为 .html 格式';
+        } else if (hasParseFailures) {
+          detail = '文件已识别但解析为空，常见原因：页面被 WAF 拦截、或文件内容不完整。试试先打开 HTML 文件确认内容是否正常';
+        }
+        showError('未能提取到商品数据，' + detail);
         return;
       }
 
@@ -615,8 +651,8 @@
     appendInput.addEventListener('change', (e) => {
       if (e.target.files.length > 0) {
         const file = e.target.files[0];
-        if (!file.name.endsWith('.zip') && !file.name.endsWith('.ZIP')) {
-          showError('请选择 ZIP 格式的文件');
+        if (!file.name.endsWith('.zip') && !file.name.endsWith('.ZIP') && !file.name.endsWith('.xlsx') && !file.name.endsWith('.XLSX')) {
+          showError('仅支持 ZIP 或 XLSX 文件');
           return;
         }
         if (file.size > 100 * 1024 * 1024) {
