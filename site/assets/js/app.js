@@ -259,8 +259,8 @@
       }
 
       if (scan.totalHtml === 0) {
-        const fileCount = scan.totalFiles != null ? scan.totalFiles + ' 个文件，但' : '';
-        showError('ZIP 中没有找到 HTML 文件' + (fileCount ? '，该压缩包包含 ' + fileCount : '') + '没有 .html 网页文件。请确认压缩包内包含网页截图');
+        const totalFiles = scan.totalFiles != null ? scan.totalFiles + ' 个文件' : '';
+        showError('ZIP 中没有找到可解析的文件（不支持 .html / .xlsx 以外格式），该压缩包包含 ' + totalFiles);
         return;
       }
 
@@ -269,7 +269,8 @@
         return;
       }
 
-      setProgress(25, '检测到 ' + scan.totalHtml + ' 个 HTML 文件，平台: ' + (scan.platform === 'alibaba' ? '1688' : (scan.platform === 'zkh' ? '震坤行' : '京东')) + '，开始解析...');
+      const fileTypeLabel = scan.sampleFile === '.xlsx' ? 'XLSX' : 'HTML';
+      setProgress(25, '检测到 ' + scan.totalHtml + ' 个 ' + fileTypeLabel + ' 文件，平台: ' + (scan.platform === 'alibaba' ? '1688' : (scan.platform === 'zkh' ? '震坤行' : '京东')) + '，开始解析...');
 
       // 执行解析
       const output = await PageHarvestParser.parseFile(currentFile, mode);

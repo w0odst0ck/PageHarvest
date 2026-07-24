@@ -31,15 +31,23 @@ const PageHarvestParser = (() => {
 
     const zip = await JSZip.loadAsync(zipFile);
 
-    // 找第一个 HTML 文件
     let firstHtml = null;
     let totalHtml = 0;
+    let totalXlsx = 0;
     zip.forEach((relativePath, entry) => {
-      if (!entry.dir && /\.(html?|mhtml?)$/i.test(relativePath)) {
+      if (entry.dir) return;
+      if (/\.(html?|mhtml?)$/i.test(relativePath)) {
         totalHtml++;
         if (!firstHtml) firstHtml = { path: relativePath, entry };
+      } else if (/\.xlsx?$/i.test(relativePath)) {
+        totalXlsx++;
       }
     });
+
+    // 仅含 xlsx 文件 → 直接视为 1688 采购助手数据
+    if (!firstHtml && totalXlsx > 0) {
+      return { platform: 'alibaba', totalHtml: totalXlsx, totalFiles: Object.keys(zip.files).length, sampleFile: '.xlsx' };
+    }
 
     if (!firstHtml) {
       return { platform: 'unknown', totalHtml: 0, totalFiles: Object.keys(zip.files).length };
